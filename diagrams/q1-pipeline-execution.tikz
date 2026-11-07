@@ -1,0 +1,23 @@
+\begin{tikzpicture}[font=\sffamily]
+
+% Pipeline Matrix
+\matrix [matrix of nodes,
+         nodes={draw, minimum width=2cm, minimum height=0.7cm, anchor=center, align=center},
+         column 1/.style={nodes={text width=5.88cm, align=left}}, % Fixes the instruction column width
+         column sep=-\pgflinewidth,
+         row sep=-\pgflinewidth,
+         nodes in empty cells] (pipeline)
+{
+    |[draw=none]| \textbf{Instruction} & \textbf{C1} & \textbf{C2} & \textbf{C3} & \textbf{C4} & \textbf{C5} & \textbf{C6} & \textbf{C7} & \textbf{C8} & \textbf{C9} & \textbf{C10} & \textbf{C11} & \textbf{C12} & \textbf{C13} \\
+    |[draw=none]| \texttt{flw f31, 32(x10)}  & F2 & F2 & ID & EX & |[fill=red!30, font=\bfseries]| M1 & M2 & RW & & & & & & \\
+    |[draw=none]| \texttt{fsw f11, 8(x10)}   & & F1 & F2 & ID & EX & |[fill=red!30, font=\bfseries]| M1 & M2 & RW & & & & & \\
+    |[draw=none]| \texttt{slli x24, x24, 2}  & & & F1 & F2 & ID & EX & M1* & M2* & RW & & & & \\
+    |[draw=none]| \texttt{fsub f11, f31, f13}& & & & F1 & F2 & ID & EX1 & EX2 & EX3 & RW & & & \\
+    |[draw=none]| \texttt{add x10, x10, x24} & & & & & |[fill=red!30, font=\bfseries]| STALL & |[fill=red!30, font=\bfseries]| STALL & F1 & F2 & ID & EX & M1 & M2 & RW \\
+    |[draw=none]| \texttt{blt x24, x5, label}& & & & & & & & F1 & F2 & ID & EX & M1 & M2 \\
+};
+
+
+
+
+\end{tikzpicture}

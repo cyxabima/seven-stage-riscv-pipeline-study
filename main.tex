@@ -1,0 +1,595 @@
+\documentclass[11pt, a4paper]{article}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+%% \usepackage{fontspec}
+%% \usepackage[english, bidi=basic, provide=*]{babel}
+%% \babelprovide[import, onchar=ids fonts]{english}
+%% \babelfont{rm}{Noto Sans}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,matrix, positioning}
+\usepackage{graphicx}
+
+\usepackage{hyperref}
+
+\definecolor{accent}{HTML}{1E3A8A}
+\definecolor{muted}{HTML}{475569}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=accent,
+    urlcolor=accent
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+\begin{document}
+
+% ---------------------------------------------------------
+% HEADER / TITLE BLOCK
+% ---------------------------------------------------------
+\begin{center}
+    {\LARGE \textbf{\textcolor{accent}{Computer Architecture --- CS 328 (Fall 2026)}}}\\[4pt]
+    {\Large \textbf{Complex Engineering Problem}}
+\end{center}
+
+\vspace{4pt}
+\begin{tabularx}{\textwidth}{@{}X X@{}}
+    \toprule
+    \textbf{Student 1 Name:} Ukasha & \textbf{Seat No:} CS024115 \\
+    \midrule
+    \textbf{Student 2 Name:} Abdullah Baig& \textbf{Seat No:} CS-24123 \\
+    \bottomrule
+\end{tabularx}
+
+\vspace{8pt}
+\textbf{Architecture Summary:}
+
+\begin{figure}[htbp]
+    \centering
+
+    \input{diagrams/cpu_pipeline.tikz}
+
+    \caption{Seven-Stage CPU Pipeline Architecture}
+    \label{fig:cpu-pipeline}
+\end{figure}
+
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Integer \& Memory Pipeline:} \texttt{F1} $\rightarrow$ \texttt{F2} $\rightarrow$ \texttt{ID} $\rightarrow$ \texttt{EX} $\rightarrow$ \texttt{M1} $\rightarrow$ \texttt{M2} $\rightarrow$ \texttt{RW} (32 integer registers \texttt{x0}--\texttt{x31}, where \texttt{x0} is hardwired zero).
+    \item \textbf{Floating-Point Pipeline:} \texttt{F1} $\rightarrow$ \texttt{F2} $\rightarrow$ \texttt{ID} $\rightarrow$ \texttt{EX-1} $\rightarrow$ \texttt{EX-2} $\rightarrow$ \texttt{EX-3} $\rightarrow$ \texttt{RW} (32 single-precision FP registers \texttt{f0}--\texttt{f31}, where \texttt{f0} is not hardwired zero).
+\end{itemize}
+
+\hrule
+\vspace{8pt}
+
+% ---------------------------------------------------------
+% QUESTION 1
+% ---------------------------------------------------------
+\section*{\textcolor{accent}{Question 1: Structural Hazard Analysis}}
+
+\subsection*{i. Pipeline Diagram for Unified Memory Structural Hazards}
+\textit{Assume a single unified memory (handling both instructions and data) and branch not taken.}
+
+
+
+\begin{figure}[htbp]
+    \centering
+    \resizebox{\textwidth}{!}{
+    \input{diagrams/q1-pipeline-execution.tikz}
+    }    
+    \caption{Structural Hazard}
+    \label{fig:q1-pipeline-execution}
+    
+\end{figure}
+
+\newpage
+\textbf{Explanation of Stalls:}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item A Structural Hazard happens here because a single pipelined memory is used for both instructions and data, so a conflict occurs whenever an instruction fetch (\texttt{F1}/\texttt{F2}) and a data memory operation (\texttt{M1}/\texttt{M2}) need the same stage of the memory in the same cycle.
+    \item In the given code, \texttt{flw} (1st instruction) and \texttt{fsw} (2nd instruction) are the only instructions that actually access data memory in \texttt{M1} and \texttt{M2}. All other instructions only use the CPU's internal pipeline registers during \texttt{M1} and \texttt{M2}.
+    \item Since \texttt{M1} is the 5th stage of the pipeline, \texttt{flw} reaches \texttt{M1} in \textbf{Cycle 5} at the exact same time the 5th instruction (\texttt{add x10, x10, x24}) needs to enter \texttt{F1}.
+    \item Because both \texttt{M1} and \texttt{F1} use the first stage of the memory, the 5th instruction (\texttt{add}) must stall in \textbf{Cycle 5}.
+    \item One stall removes the conflict with \texttt{flw}, but in \textbf{Cycle 6} the 2nd instruction (\texttt{fsw}) enters \texttt{M1}. This causes a second collision with the stalled \texttt{add} instruction trying to enter \texttt{F1}, so \texttt{add} has to stall again in \textbf{Cycle 6} and finally enters \texttt{F1} in \textbf{Cycle 7} (total of \textbf{2 stalls}).
+    \item \textbf{Assumption:} Since the unified memory is pipelined into two internal stages (Stage 1 for \texttt{F1}/\texttt{M1} and Stage 2 for \texttt{F2}/\texttt{M2}), Stage 1 and Stage 2 can work in parallel in the same cycle. This means \texttt{fsub} in \texttt{F2} can run alongside \texttt{flw} in \texttt{M1} (Cycle 5), and \texttt{add} in \texttt{F1} can run alongside \texttt{fsw} in \texttt{M2} (Cycle 7) without a second stall per instruction.
+\end{itemize}
+
+\subsection*{ii. Feasibility of Reducing Stalls via Code Reordering}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{No}, in general, stalls from this structural hazard cannot be reduced by reordering the code.
+    \item Every instruction in the program has to be fetched from memory during \texttt{F1} and \texttt{F2}. No matter where we move a \texttt{Load} or \texttt{Store} instruction, when it reaches \texttt{M1} (4 cycles after \texttt{F1}), it will still collide with whichever instruction is 4 positions behind it trying to enter \texttt{F1}.
+    \item The only rare exception is if we move a memory instruction to the very end of the program (within the last 4 instructions) where there are no more instructions left to fetch when it reaches \texttt{M1}. In normal program execution, there are always instructions following it, so the number of stalls stays the same.
+\end{itemize}
+
+\subsection*{iii. Eliminating the Structural Hazard Using Software NOPs}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{No}, this structural hazard cannot be removed by adding software or compiler \texttt{nop}s.
+    \item A software \texttt{nop} (like \texttt{addi x0, x0, 0}) is still a real instruction stored in memory. Even though it does not write to any register or data memory, it still has to be fetched from the memory during \texttt{F1} and \texttt{F2}.
+    \item Because fetching a \texttt{nop} in \texttt{F1} still uses the memory in the same cycle that an older memory instruction is in \texttt{M1}, the collision still happens. We need a hardware stall (bubble) that holds the \texttt{PC} and stops the \texttt{F1} fetch for that cycle.
+\end{itemize}
+
+\subsection*{iv. Estimated Stall Cycles per 100 Dynamically Executed Instructions}
+
+\begin{center}
+\begin{tabular}{@{}l c c c c@{}}
+\toprule
+\textbf{Category} & \textbf{ALU/Logic} & \textbf{Jump/Branch} & \textbf{Load} & \textbf{Store} \\
+\midrule
+\textbf{Frequency} & 45\% & 15\% & 25\% & 15\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Assumptions:}
+\begin{enumerate}[noitemsep, topsep=2pt]
+    \item Only structural hazards are considered (no extra stalls or flushes from data hazards or branches).
+    \item Only \texttt{Load} and \texttt{Store} instructions use the external memory in \texttt{M1} and \texttt{M2}; \texttt{ALU/Logic} and \texttt{Jump/Branch} do not access data memory.
+    \item Because the memory has 2 internal pipeline stages, stalling \texttt{F1} for 1 cycle during \texttt{M1} automatically puts a bubble into \texttt{F2} during \texttt{M2}, allowing the stalled instruction to enter \texttt{F1} while the memory instruction is in \texttt{M2}. Thus, each \texttt{Load} or \texttt{Store} causes \textbf{1 stall cycle}.
+    \item All memory accesses are cache hits.
+\end{enumerate}
+
+\textbf{Calculation:}
+\begin{align*}
+    \text{Memory Instructions per 100 Instructions} &= \text{Load (25\%)} + \text{Store (15\%)} = 40\text{ instructions} \\
+    \text{Stalls per Memory Instruction} &= 1\text{ cycle} \\
+    \text{Total Stall Cycles per 100 Instructions} &= 40 \times 1 = \mathbf{40\text{ stall cycles}}
+\end{align*}
+
+\vspace{8pt}
+\hrule
+\vspace{8pt}
+
+\newpage
+% Helper macro using \input
+\newcommand{\showdiag}[1]{%
+    \begin{center}
+        \resizebox{\textwidth}{!}{\input{diagrams/#1.tikz}}
+    \end{center}
+}
+% ---------------------------------------------------------
+% QUESTION 2
+% ---------------------------------------------------------
+\section*{\textcolor{accent}{Question 2: Forwarding Logic Design Trade-offs}}
+\subsection*{i. \& ii. Assembly Sequences, Required NOPs, and Pipeline Diagrams}
+
+% --- Pattern 1 ---
+\subsubsection*{1. EX to 1st Only (10\%)}
+\textbf{4-Instruction Sequence:} \texttt{add x5, x3, x2} $\rightarrow$ \texttt{addi x10, x5, 8} $\rightarrow$ \texttt{add x20, x21, x22} $\rightarrow$ \texttt{sub x23, x24, x25} \\
+\textbf{NOPs Required:} 3 \texttt{nop}s inserted after \texttt{add x5, x3, x2}.
+
+\showdiag{dependency-01}
+
+% --- Pattern 2 ---
+\subsubsection*{2. MEM to 1st Only (15\%)}
+\textbf{4-Instruction Sequence:} \texttt{lw x5, 0(x2)} $\rightarrow$ \texttt{addi x10, x5, 8} $\rightarrow$ \texttt{add x20, x21, x22} $\rightarrow$ \texttt{sub x23, x24, x25} \\
+\textbf{NOPs Required:} 3 \texttt{nop}s inserted after \texttt{lw x5, 0(x2)}.
+
+\showdiag{dependency-02}
+
+% --- Pattern 3 ---
+\subsubsection*{3. EX to 2nd Only (10\%)}
+\textbf{4-Instruction Sequence:} \texttt{add x5, x3, x2} $\rightarrow$ \texttt{add x20, x21, x22} $\rightarrow$ \texttt{addi x10, x5, 8} $\rightarrow$ \texttt{sub x23, x24, x25} \\
+\textbf{NOPs Required:} 2 \texttt{nop}s inserted after \texttt{add x20, x21, x22}.
+
+\showdiag{dependency-03}
+
+% --- Pattern 4 ---
+\subsubsection*{4. MEM to 2nd Only (10\%)}
+\textbf{4-Instruction Sequence:} \texttt{lw x5, 0(x2)} $\rightarrow$ \texttt{add x20, x21, x22} $\rightarrow$ \texttt{addi x10, x5, 8} $\rightarrow$ \texttt{sub x23, x24, x25} \\
+\textbf{NOPs Required:} 2 \texttt{nop}s inserted after \texttt{add x20, x21, x22}.
+
+\showdiag{dependency-04}
+
+% --- Pattern 5 ---
+\subsubsection*{5. EX to 1st and 2nd (15\%)}
+\textbf{4-Instruction Sequence:} \texttt{add x5, x3, x2} $\rightarrow$ \texttt{addi x10, x5, 8} $\rightarrow$ \texttt{sub x11, x5, x4} $\rightarrow$ \texttt{add x20, x21, x22} \\
+\textbf{NOPs Required:} 3 \texttt{nop}s inserted after \texttt{add x5, x3, x2}.
+
+\showdiag{dependency-05}
+
+% --- Pattern 6 ---
+\subsubsection*{6. EX to 1st and 3rd (5\%)}
+\textbf{4-Instruction Sequence:} \texttt{add x5, x3, x2} $\rightarrow$ \texttt{addi x10, x5, 8} $\rightarrow$ \texttt{add x20, x21, x22} $\rightarrow$ \texttt{sub x12, x5, x6} \\
+\textbf{NOPs Required:} 3 \texttt{nop}s inserted after \texttt{add x5, x3, x2}.
+
+\showdiag{dependency-06}
+
+% --- Pattern 7 ---
+\subsubsection*{7. EX to 2nd and 3rd (5\%)}
+\textbf{4-Instruction Sequence:} \texttt{add x5, x3, x2} $\rightarrow$ \texttt{add x20, x21, x22} $\rightarrow$ \texttt{addi x10, x5, 8} $\rightarrow$ \texttt{sub x12, x5, x6} \\
+\textbf{NOPs Required:} 2 \texttt{nop}s inserted after \texttt{add x20, x21, x22}.
+
+\showdiag{dependency-07}
+
+% --- Pattern 8 ---
+\subsubsection*{8. MEM to 1st and 2nd (10\%)}
+\textbf{4-Instruction Sequence:} \texttt{lw x5, 0(x2)} $\rightarrow$ \texttt{addi x10, x5, 8} $\rightarrow$ \texttt{sub x11, x5, x4} $\rightarrow$ \texttt{add x20, x21, x22} \\
+\textbf{NOPs Required:} 3 \texttt{nop}s inserted after \texttt{lw x5, 0(x2)}.
+
+\showdiag{dependency-08}
+
+% --- Pattern 09 ---
+\subsubsection*{9. MEM to 1st and 3rd (5\%)}
+\textbf{4-Instruction Sequence:} \texttt{lw x5, 0(x2)} $\rightarrow$ \texttt{addi x10, x5, 8} $\rightarrow$ \texttt{add x20, x21, x22} $\rightarrow$ \texttt{sub x12, x5, x6} \\
+\textbf{NOPs Required:} 3 \texttt{nop}s inserted after \texttt{lw x5, 0(x2)}.
+
+\showdiag{dependency-09}
+
+% --- Pattern 10 ---
+\subsubsection*{10. MEM to 2nd and 3rd (8\%)}
+\textbf{4-Instruction Sequence:} \texttt{lw x5, 0(x2)} $\rightarrow$ \texttt{add x20, x21, x22} $\rightarrow$ \texttt{addi x10, x5, 8} $\rightarrow$ \texttt{sub x12, x5, x6} \\
+\textbf{NOPs Required:} 2 \texttt{nop}s inserted after \texttt{add x20, x21, x22}.
+
+\showdiag{dependency-10}
+
+% --- Pattern 11 ---
+\subsubsection*{11. EX to 1st, 2nd and 3rd (5\%)}
+\textbf{4-Instruction Sequence:} \texttt{add x5, x3, x2} $\rightarrow$ \texttt{addi x10, x5, 8} $\rightarrow$ \texttt{sub x11, x5, x4} $\rightarrow$ \texttt{add x12, x5, x6} \\
+\textbf{NOPs Required:} 3 \texttt{nop}s inserted after \texttt{add x5, x3, x2}.
+
+\showdiag{dependency-11}
+
+% --- Pattern 12 ---
+\subsubsection*{12. MEM to 1st, 2nd and 3rd (2\%)}
+\textbf{4-Instruction Sequence:} \texttt{lw x5, 0(x2)} $\rightarrow$ \texttt{addi x10, x5, 8} $\rightarrow$ \texttt{sub x11, x5, x4} $\rightarrow$ \texttt{add x12, x5, x6} \\
+\textbf{NOPs Required:} 3 \texttt{nop}s inserted after \texttt{lw x5, 0(x2)}.
+
+\showdiag{dependency-12}
+
+
+
+\vspace{6pt}
+\textbf{General Pattern Observed from NOP Insertion (No Forwarding):}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item Without forwarding, it does not matter whether the producer is an \texttt{EX} instruction or a \texttt{MEM} (\texttt{lw}) instruction because both write their final value to the register file at the start of \texttt{RW} (Cycle 7), right before \texttt{ID} reads registers in that same cycle.
+    \item \textbf{Whenever the 1st instruction is dependent:} We insert \textbf{3 \texttt{nop}s} right after the producer so that the 1st instruction reaches \texttt{ID} in Cycle 7. Because those 3 \texttt{nop}s also delay the 2nd and 3rd instructions into Cycles 8 and 9, they automatically read the updated register value from the register file without needing any extra \texttt{nop}s.
+    \item \textbf{Whenever the 1st instruction is independent and the 2nd is dependent:} The 1st instruction executes normally, and we insert \textbf{2 \texttt{nop}s} before the 2nd instruction so its \texttt{ID} stage lands in Cycle 7. This also shifts the 3rd instruction to Cycle 8, so again no extra \texttt{nop}s are needed for the 3rd instruction.
+\end{itemize}
+
+\subsection*{iii. CPI and Stall Percentage with No Forwarding}
+
+\textbf{Grouped Dependency Categories (No Forwarding):}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{3-Stall Group (1st instruction is dependent):} Includes \texttt{EX to 1st Only} (10\%), \texttt{MEM to 1st Only} (15\%), \texttt{EX to 1st and 2nd} (15\%), \texttt{EX to 1st and 3rd} (5\%), \texttt{MEM to 1st and 2nd} (10\%), \texttt{MEM to 1st and 3rd} (5\%), \texttt{EX to 1st, 2nd and 3rd} (5\%), and \texttt{MEM to 1st, 2nd and 3rd} (2\%). \\
+    \textbf{Total Fraction} = $0.10 + 0.15 + 0.15 + 0.05 + 0.10 + 0.05 + 0.05 + 0.02 = \mathbf{67\%}$ ($\text{Stalls} = 3$).
+    
+    \item \textbf{2-Stall Group (1st independent, 2nd dependent):} Includes \texttt{EX to 2nd Only} (10\%), \texttt{MEM to 2nd Only} (10\%), \texttt{EX to 2nd and 3rd} (5%), and \texttt{MEM to 2nd and 3rd} (8%). \\
+    \textbf{Total Fraction} = $0.10 + 0.10 + 0.05 + 0.08 = \mathbf{33\%}$ ($\text{Stalls} = 2$).
+\end{itemize}
+
+\textbf{Calculation:}
+\begin{align*}
+    \text{CPI}_{\text{No FW}} &= 1 + \sum \left(\text{Fraction}_i \times \text{Stalls}_i\right) \\
+    &= 1 + (0.67 \times 3) + (0.33 \times 2) \\
+    &= 1 + 2.01 + 0.66 \\
+    &= \mathbf{3.67} \\[6pt]
+    \text{Stall Cycle Percentage} &= \left(\frac{\text{CPI}_{\text{No FW}} - 1}{\text{CPI}_{\text{No FW}}}\right) \times 100\% \\
+    &= \left(\frac{3.67 - 1}{3.67}\right) \times 100\% \\
+    &= \left(\frac{2.67}{3.67}\right) \times 100\% \approx \mathbf{72.75\%}
+\end{align*}
+
+
+\subsection*{iv. CPI and Stall Percentage with Full Forwarding (Including Memory-Stage Forwarding Analysis)}
+
+\textbf{1. Standard Full Forwarding Assumption (All Paths to ALU in EX):}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{0-Stall Group (50\%):} All \texttt{EX} producer categories use full forwarding (\texttt{EX/M1}, \texttt{M1/M2}, \texttt{M2/RW} to ALU) with 0 stalls, alongside \texttt{MEM to 3rd Only}.
+    \item \textbf{1-Stall Group (18\%):} Includes \texttt{MEM to 2nd Only} (10\%) and \texttt{MEM to 2nd and 3rd} (8\%) waiting 1 cycle to catch \texttt{M2/RW} $\rightarrow$ \texttt{EX} in Cycle 7.
+    \item \textbf{2-Stall Group (32\%):} Includes all \texttt{MEM to 1st...} categories (15\% + 10\% + 5\% + 2\%), stalling the 1st instruction for 2 cycles (Cycles 5 and 6) to catch \texttt{M2/RW} $\rightarrow$ \texttt{EX} in Cycle 7.
+\end{itemize}
+
+\textbf{Standard Calculation:}
+\begin{align*}
+    \text{CPI}_{\text{Standard Full FW}} &= 1 + \sum \left(\text{Fraction}_i \times \text{Stalls}_i\right) \\
+    &= 1 + (0.32 \times 2) + (0.18 \times 1) \\
+    &= 1 + 0.64 + 0.18 = \mathbf{1.82} \\[4pt]
+    \text{Stall Cycle Percentage} &= \left(\frac{1.82 - 1}{1.82}\right) \times 100\% \approx \mathbf{45.05\%}
+\end{align*}
+
+\vspace{6pt}
+\textbf{2. Extended Architectural Scenario (Adding a Dedicated Memory Forwarding Unit to Stage \texttt{M1}):}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbfThe limitation in the standard model is that all `MEM` consumers must wait for the ALU input in `EX`. If we introduce a \textbf{second forwarding unit} dedicated to the memory stage (`M1`), data from a load instruction can bypass directly into a store instruction (\texttt{lw} $\rightarrow$ \texttt{sw} data dependency) or memory address calculation in `M1` without waiting for `EX`.
+    \item \textbf{Impact on Stalls:} Under this extended architecture, store-data consumers that only need the loaded value in `M1` require \textbf{1 fewer stall} (dropping from 2 stalls down to 1 stall for immediate pairs, or 0 stalls if separated by a gap). 
+    \item \textbf{Resulting CPI Improvement:} Because a fraction of the `MEM` hazard categories involve store-data bypassing rather than ALU execution, adding this second forwarding unit reduces the effective average stalls per instruction, driving the CPI below $1.82$ depending on the mix of load-to-store vs. load-to-ALU instructions).
+\end{itemize}
+
+\subsection*{v. Feasibility and Disadvantages of Full ALU Forwarding}
+
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Feasibility:} Yes, implementing full ALU forwarding is feasible and gives the fastest actual execution time because it drops the CPI from $3.67$ down to $1.82$ (or lower with \texttt{M1} memory forwarding).
+    \item \textbf{Disadvantages:}
+        \begin{enumerate}[noitemsep, topsep=1pt]
+            \item \textbf{Clock Cycle Time Penalty ($160\text{ ps} \rightarrow 200\text{ ps}$):} Without forwarding (or with only 1 path), the slowest stage in the pipeline is memory (\texttt{M1}/\texttt{M2}) at $160\text{ ps}$. Adding 2 paths stretches \texttt{EX} to $180\text{ ps}$, and adding all 3 paths stretches \texttt{EX} to $200\text{ ps}$. This slows down the global clock by $25\%$ for every instruction in the program, even instructions that have no hazards at all.
+            \item \textbf{Extra Hardware and Wiring:} We need larger 4-to-1 multiplexers in front of the ALU inputs, long 32-bit wires coming back from three different pipeline registers, and priority logic in the forwarding unit (so if \texttt{EX/M1} and \texttt{M1/M2} both match, the newer value in \texttt{EX/M1} is chosen).
+        \end{enumerate}
+\end{itemize}
+
+\subsection*{vi. CPI for Each Single-Stage Forwarding Option}
+
+With only one forwarding path active, the \texttt{EX} stage takes $160\text{ ps}$, which matches \texttt{M1} and \texttt{M2}, so the clock cycle stays at $\mathbf{160\text{ ps}}$. There are two ways the Hazard Detection Unit (HDU) can handle instructions whose exact forwarding path is missing:
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Assumption A (Stall until Forwardable):} If a later path (like \texttt{M1/M2} or \texttt{M2/RW}) exists, an earlier dependent instruction stalls only until the producer reaches that forwarding stage.
+    \item \textbf{Assumption B (Stall until \texttt{RW} if zero-stall path is missing):} If the immediate path for an \texttt{EX} producer is missing, it waits until \texttt{RW} (Cycle 7).
+\end{itemize}
+
+\textbf{1. Forwarding ONLY from \texttt{EX/M1} to ALU ($T_{\text{clk}} = 160\text{ ps}$):}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{0 Stalls (10\%):} \texttt{EX to 1st Only} (10\%) uses \texttt{EX/M1} directly.
+    \item \textbf{1 Stall (5\%):} \texttt{EX to 1st and 3rd} (5\%) --- the 1st instruction uses \texttt{EX/M1} with 0 stalls, and the 3rd instruction stalls 1 cycle to read from \texttt{RW} in Cycle 7.
+    \item \textbf{2 Stalls (53\%):} \texttt{EX to 1st and 2nd} (15\%) and \texttt{EX to 1st, 2nd and 3rd} (5\%) use \texttt{EX/M1} for the 1st instruction, then stall the 2nd instruction for 2 cycles until \texttt{RW} (which also pushes the 3rd instruction into Cycle 8). \texttt{EX to 2nd Only} (10\%), \texttt{EX to 2nd and 3rd} (5\%), \texttt{MEM to 2nd Only} (10\%), and \texttt{MEM to 2nd and 3rd} (8\%) also stall 2 cycles for \texttt{RW}. Total = $15\% + 5\% + 10\% + 5\% + 10\% + 8\% = 53\%$.
+    \item \textbf{3 Stalls (32\%):} All \texttt{MEM to 1st...} categories ($15\% + 10\% + 5\% + 2\% = 32\%$) stall 3 cycles for \texttt{RW}.
+\end{itemize}
+\begin{align*}
+    \text{CPI}_{\text{EX/M1}} &= 1 + (0.05 \times 1) + (0.53 \times 2) + (0.32 \times 3) \\
+    &= 1 + 0.05 + 1.06 + 0.96 = \mathbf{3.07}
+\end{align*}
+
+\textbf{2. Forwarding ONLY from \texttt{M1/M2} to ALU ($T_{\text{clk}} = 160\text{ ps}$):}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Under Assumption A:}
+        \begin{itemize}[noitemsep, topsep=1pt]
+            \item \textbf{0 Stalls (10\%):} \texttt{EX to 2nd Only} (10\%) uses \texttt{M1/M2} directly.
+            \item \textbf{1 Stall (20\%):} \texttt{EX to 1st Only} (10\%) and \texttt{EX to 1st and 3rd} (5\%) stall the 1st instruction for 1 cycle so it catches \texttt{M1/M2} (which automatically pushes the 3rd instruction to Cycle 7/\texttt{RW}). \texttt{EX to 2nd and 3rd} (5\%) uses \texttt{M1/M2} for the 2nd instruction and stalls the 3rd instruction 1 cycle for \texttt{RW}. Total = $10\% + 5\% + 5\% = 20\%$.
+            \item \textbf{2 Stalls (38\%):} \texttt{EX to 1st and 2nd} (15\%) and \texttt{EX to 1st, 2nd and 3rd} (5\%) stall 1 cycle for the 1st instruction to use \texttt{M1/M2}, and 1 more cycle for the 2nd instruction to reach \texttt{RW} (2 stalls total). \texttt{MEM to 2nd Only} (10\%) and \texttt{MEM to 2nd and 3rd} (8\%) wait 2 cycles for \texttt{RW}. Total = $15\% + 5\% + 10\% + 8\% = 38\%$.
+            \item \textbf{3 Stalls (32\%):} All \texttt{MEM to 1st...} categories (32\%) wait 3 cycles for \texttt{RW}.
+        \end{itemize}
+        \begin{align*}
+            \text{CPI}_{\text{M1/M2 (A)}} &= 1 + (0.20 \times 1) + (0.38 \times 2) + (0.32 \times 3) = \mathbf{2.92}
+        \end{align*}
+    \item \textbf{Under Assumption B:} (Where \texttt{EX to 1st...} waits 3 cycles for \texttt{RW}):
+        \begin{align*}
+            \text{CPI}_{\text{M1/M2 (B)}} &= 1 + (0.05 \times 1) + (0.18 \times 2) + (0.67 \times 3) = \mathbf{3.42}
+        \end{align*}
+\end{itemize}
+
+\textbf{3. Forwarding ONLY from \texttt{M2/RW} to ALU ($T_{\text{clk}} = 160\text{ ps}$):}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Under Assumption A:} Both \texttt{EX} and \texttt{MEM} producers have their data ready in \texttt{M2/RW} in Cycle 7.
+        \begin{itemize}[noitemsep, topsep=1pt]
+            \item \textbf{1 Stall (33\%):} All 2nd-instruction dependent categories without the 1st (\texttt{EX to 2nd...} $15\%$ + \texttt{MEM to 2nd...} $18\% = 33\%$) stall 1 cycle to catch \texttt{M2/RW} in Cycle 7 (pushing the 3rd instruction into \texttt{RW} with 0 extra stalls).
+            \item \textbf{2 Stalls (67\%):} All 1st-instruction dependent categories (\texttt{EX to 1st...} $35\%$ + \texttt{MEM to 1st...} $32\% = 67\%$) stall 2 cycles to catch \texttt{M2/RW} in Cycle 7 (which pushes the 2nd and 3rd instructions to Cycles 8 and 9 where they read from \texttt{RW} with 0 extra stalls).
+        \end{itemize}
+        \begin{align*}
+            \text{CPI}_{\text{M2/RW (A)}} &= 1 + (0.33 \times 1) + (0.67 \times 2) = 1 + 0.33 + 1.34 = \mathbf{2.67}
+        \end{align*}
+    \item \textbf{Under Assumption B:} (Where only \texttt{MEM} stalls to use \texttt{M2/RW}, while \texttt{EX to 1st/2nd} waits for \texttt{RW}):
+        \begin{align*}
+            \text{CPI}_{\text{M2/RW (B)}} &= 1 + (0.18 \times 1) + (0.47 \times 2) + (0.35 \times 3) = \mathbf{3.17}
+        \end{align*}
+\end{itemize}
+
+\subsection*{vii. Speedup Comparison and Final Recommendation}
+
+To compare the actual execution time per instruction, we multiply $\text{CPI} \times T_{\text{clk}}$ and compare against the No-Forwarding baseline ($\text{Time}_{\text{No FW}} = 3.67 \times 160\text{ ps} = \mathbf{587.2\text{ ps}}$):
+\[
+    \text{Speedup} = \frac{\text{Execution Time}_{\text{No FW}}}{\text{Execution Time}_{\text{Option}}} = \frac{587.2\text{ ps}}{\text{CPI}_{\text{Option}} \times T_{\text{clk, Option}}}
+\]
+
+\begin{center}
+\begin{tabular}{@{}l c c c c@{}}
+\toprule
+\textbf{Forwarding Configuration} & \textbf{Clock ($T_{\text{clk}}$)} & \textbf{CPI (A / B)} & \textbf{Time / Inst (A / B)} & \textbf{Speedup vs. No FW} \\
+\midrule
+No Forwarding & $160\text{ ps}$ & $3.67$ & $587.2\text{ ps}$ & $\mathbf{1.00\times}$ (Baseline) \\
+Only \texttt{EX/M1} $\rightarrow$ \texttt{EX} & $160\text{ ps}$ & $3.07$ & $491.2\text{ ps}$ & $\mathbf{1.20\times}$ \\
+Only \texttt{M1/M2} $\rightarrow$ \texttt{EX} & $160\text{ ps}$ & $2.92$ / $3.42$ & $467.2$ / $547.2\text{ ps}$ & $\mathbf{1.26\times}$ / $\mathbf{1.07\times}$ \\
+Only \texttt{M2/RW} $\rightarrow$ \texttt{EX} & $160\text{ ps}$ & $2.67$ / $3.17$ & $427.2$ / $507.2\text{ ps}$ & $\mathbf{1.375\times}$ / $\mathbf{1.16\times}$ \\
+Full ALU Forwarding (All 3) & $200\text{ ps}$ & $1.82$ & $364.0\text{ ps}$ & $\mathbf{1.61\times}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Final Recommendation:}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Best Overall Performance:} We recommend \textbf{Full Forwarding} (and ideally adding the \texttt{M1} memory-stage store-data Forwarding Unit). Even though the clock cycle slows down from $160\text{ ps}$ to $200\text{ ps}$, cutting the CPI down to $1.82$ (or $1.63$ with \texttt{M1} bypassing) reduces the total time per instruction from $587.2\text{ ps}$ to $364.0\text{ ps}$ (a $\mathbf{1.61\times}$ speedup, or $\mathbf{1.80\times}$ with \texttt{M1} bypassing).
+    \item \textbf{Best Single-Path Option (If Clock Must Stay at $160\text{ ps}$):} If hardware budget is tight and we want to keep the $160\text{ ps}$ clock cycle, forwarding \textbf{only from \texttt{M2/RW}} is the best single-path choice ($\text{CPI} = 2.67$, speedup = $\mathbf{1.375\times}$). 
+\end{itemize}
+
+\vspace{8pt}
+\hrule
+\vspace{8pt}
+
+% ---------------------------------------------------------
+% QUESTION 3
+% ---------------------------------------------------------
+
+
+
+\section*{Question 3: Forwarding Unit Design and Floating-Point Pipeline}
+
+\subsection*{i. Integer Pipeline Forwarding Unit Conditions (\texttt{EX/M1}, \texttt{M1/M2}, and \texttt{M2/RW} to \texttt{EX})}
+
+\textbf{Assumptions and Logic:}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item Stalling is handled separately by the Hazard Detection Unit (HDU), so the forwarding unit equations remain the same regardless of stalls. The forwarding unit only checks if the instruction currently in \texttt{EX} needs a register value held in \texttt{EX/M1}, \texttt{M1/M2}, or \texttt{M2/RW}.
+    \item For paths \texttt{EX/M1} and \texttt{M1/M2}, we check that \texttt{MemRead == 0} because a Load instruction (\texttt{lw}) does not have its data ready until the end of \texttt{M2}. In \texttt{M2/RW}, the \texttt{lw} data is ready, so we do not negate \texttt{MemRead} there.
+    \item Since integer register \texttt{x0} is hardwired to zero, we must check that the destination register is not \texttt{x0} ($\texttt{Rd} \neq 0$).
+    \item \textbf{Priority Rule:} If more than one later stage writes to the same destination register, we must pick the latest (youngest) instruction. Therefore, \texttt{EX/M1} has the highest priority, \texttt{M1/M2} only forwards if \texttt{EX/M1} does not match, and \texttt{M2/RW} only forwards if neither \texttt{EX/M1} nor \texttt{M1/M2} matches.
+\end{itemize}
+
+\textbf{1. Forwarding Logic for First ALU Operand (\texttt{Rs1} / \texttt{ForwardA}):}
+
+\textit{Base Match Conditions for \texttt{Rs1}:}
+\begin{align*}
+    \text{Cond}_{1A} &= (\texttt{EX/M1.RegWrite} == 1) \text{ and } (\texttt{EX/M1.Rd} \neq 0) \text{ and } (\texttt{EX/M1.MemRead} == 0) \text{ and } (\texttt{EX/M1.Rd} == \texttt{ID/EX.Rs1}) \\
+    \text{Cond}_{2A} &= (\texttt{M1/M2.RegWrite} == 1) \text{ and } (\texttt{M1/M2.Rd} \neq 0) \text{ and } (\texttt{M1/M2.MemRead} == 0) \text{ and } (\texttt{M1/M2.Rd} == \texttt{ID/EX.Rs1}) \\
+    \text{Cond}_{3A} &= (\texttt{M2/RW.RegWrite} == 1) \text{ and } (\texttt{M2/RW.Rd} \neq 0) \text{ and } (\texttt{M2/RW.Rd} == \texttt{ID/EX.Rs1})
+\end{align*}
+
+\textit{Control Signal Equations for \texttt{ForwardA} (with Priority):}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Path 1 (\texttt{EX/M1} $\rightarrow$ \texttt{EX}, \texttt{ForwardA = 1}):}
+    \[
+        \text{Cond}_{1A}
+    \]
+    \item \textbf{Path 2 (\texttt{M1/M2} $\rightarrow$ \texttt{EX}, \texttt{ForwardA = 2}):}
+    \[
+        \overline{\text{Cond}_{1A}} \text{ and } \text{Cond}_{2A}
+    \]
+    \item \textbf{Path 3 (\texttt{M2/RW} $\rightarrow$ \texttt{EX}, \texttt{ForwardA = 3}):}
+    \[
+        \overline{\text{Cond}_{1A}} \text{ and } \overline{\text{Cond}_{2A}} \text{ and } \text{Cond}_{3A}
+    \]
+    \item \textbf{No Forwarding (\texttt{ForwardA = 0}):} Otherwise (read \texttt{Rs1} directly from Register File).
+\end{itemize}
+
+\vspace{4pt}
+\textbf{2. Forwarding Logic for Second ALU Operand (\texttt{Rs2} / \texttt{ForwardB}):}
+
+\textit{Base Match Conditions for \texttt{Rs2}:}
+\begin{align*}
+    \text{Cond}_{1B} &= (\texttt{EX/M1.RegWrite} == 1) \text{ and } (\texttt{EX/M1.Rd} \neq 0) \text{ and } (\texttt{EX/M1.MemRead} == 0) \text{ and } (\texttt{EX/M1.Rd} == \texttt{ID/EX.Rs2}) \\
+    \text{Cond}_{2B} &= (\texttt{M1/M2.RegWrite} == 1) \text{ and } (\texttt{M1/M2.Rd} \neq 0) \text{ and } (\texttt{M1/M2.MemRead} == 0) \text{ and } (\texttt{M1/M2.Rd} == \texttt{ID/EX.Rs2}) \\
+    \text{Cond}_{3B} &= (\texttt{M2/RW.RegWrite} == 1) \text{ and } (\texttt{M2/RW.Rd} \neq 0) \text{ and } (\texttt{M2/RW.Rd} == \texttt{ID/EX.Rs2})
+\end{align*}
+
+\textit{Control Signal Equations for \texttt{ForwardB} (with Priority):}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Path 1 (\texttt{EX/M1} $\rightarrow$ \texttt{EX}, \texttt{ForwardB = 1}):}
+    \[
+        \text{Cond}_{1B}
+    \]
+    \item \textbf{Path 2 (\texttt{M1/M2} $\rightarrow$ \texttt{EX}, \texttt{ForwardB = 2}):}
+    \[
+        \overline{\text{Cond}_{1B}} \text{ and } \text{Cond}_{2B}
+    \]
+    \item \textbf{Path 3 (\texttt{M2/RW} $\rightarrow$ \texttt{EX}, \texttt{ForwardB = 3}):}
+    \[
+        \overline{\text{Cond}_{1B}} \text{ and } \overline{\text{Cond}_{2B}} \text{ and } \text{Cond}_{3B}
+    \]
+    \item \textbf{No Forwarding (\texttt{ForwardB = 0}):} Otherwise (read \texttt{Rs2} directly from Register File).
+\end{itemize}
+
+\vspace{8pt}
+\subsection*{ii. Pipeline Execution Diagram and Clock Cycles}
+
+\showdiag{q3-pipeline}
+
+\textbf{Total Clock Cycles Required:}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{With Forwarding Disabled:} 15 clock cycles.
+\end{itemize}
+
+\vspace{8pt}
+\subsection*{iii. Floating-Point Pipeline Forwarding Unit Conditions (\texttt{EX3/RW} to \texttt{EX1})}
+
+\textbf{Assumptions and Logic:}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item We assume all floating-point execution instructions go through all three pipelined execution stages (\texttt{EX1}, \texttt{EX2}, and \texttt{EX3}). Because the result is only finished at the end of \texttt{EX3}, we cannot forward from \texttt{EX1/EX2} or \texttt{EX2/EX3}.
+    \item This means a back-to-back dependent FP instruction must stall for 2 cycles (instead of 3 cycles without forwarding), and there is only \textbf{one} forwarding path from \texttt{EX3/RW} back to \texttt{EX1}.
+    \item Unlike integer register \texttt{x0}, the floating-point register \texttt{f0} is a normal register and is not hardwired to zero, so we do \textbf{not} check for $\texttt{Fd} \neq 0$.
+    \item We keep the \texttt{RegWrite == 1} check so that pipeline stall bubbles (\texttt{nop}s) in \texttt{EX3/RW} do not accidentally trigger forwarding.
+\end{itemize}
+
+\textbf{1. FP Forwarding Logic for First Operand (\texttt{Fs1} / \texttt{FP\_ForwardA}):}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Path 1 (\texttt{EX3/RW} $\rightarrow$ \texttt{EX1}, \texttt{FP\_ForwardA = 1}):}
+    \[
+        (\texttt{EX3/RW.RegWrite} == 1) \text{ and } (\texttt{EX3/RW.Fd} == \texttt{ID/EX1.Fs1})
+    \]
+    \item \textbf{No Forwarding (\texttt{FP\_ForwardA = 0}):} Otherwise (read \texttt{Fs1} directly from FP Register File).
+\end{itemize}
+
+\textbf{2. FP Forwarding Logic for Second Operand (\texttt{Fs2} / \texttt{FP\_ForwardB}):}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Path 1 (\texttt{EX3/RW} $\rightarrow$ \texttt{EX1}, \texttt{FP\_ForwardB = 1}):}
+    \[
+        (\texttt{EX3/RW.RegWrite} == 1) \text{ and } (\texttt{EX3/RW.Fd} == \texttt{ID/EX1.Fs2})
+    \]
+    \item \textbf{No Forwarding (\texttt{FP\_ForwardB = 0}):} Otherwise (read \texttt{Fs2} directly from FP Register File).
+\end{itemize}
+
+\vspace{8pt}
+\subsection*{iv. Datapath Interface Diagram for Both Forwarding Units}
+
+% Replace q3-datapath with your datapath diagram filename inside diagrams/
+%\showdiag{q3-datapath}
+
+
+
+\vspace{8pt}
+\hrule
+\vspace{8pt}
+
+% ---------------------------------------------------------
+% QUESTION 4
+% ---------------------------------------------------------
+\section*{\textcolor{accent}{Question 4: Hazard Detection Unit}}
+
+\subsection*{i. Instruction Sequence Requiring a Stall (with Full Forwarding)}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item [Provide the assembly sequence and pipeline execution trace here.]
+\end{itemize}
+
+\subsection*{ii. Hazard Detection Unit (HDU) Stall Conditions \& Held Registers}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Stall Conditions:} [Write boolean hazard detection equations here.]
+    \item \textbf{Control of Pipeline Registers:} [Specify which CPU registers are held constant or flushed, and how the external instruction memory pipeline is handled.]
+\end{itemize}
+
+\subsection*{iii. ID-Stage and Hazard Detection Unit Interface}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item [Detail the ID-stage datapath connections, HDU inputs, and control outputs here.]
+\end{itemize}
+
+\vspace{8pt}
+\hrule
+\vspace{8pt}
+
+% ---------------------------------------------------------
+% QUESTION 5
+% ---------------------------------------------------------
+\section*{\textcolor{accent}{Question 5: Control Hazards}}
+
+\subsection*{i. 2-Bit Saturating Counter Branch Predictor Simulation}
+\textit{Initial States: $A = 10$ (Weakly Taken), $B = 00$ (Strongly Not Taken), $C = 11$ (Strongly Taken), $D = 01$ (Weakly Not Taken).}
+
+\begin{center}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}l c c c c c c c c c c c@{}}
+\toprule
+\textbf{Step} & \textbf{$t+1$} & \textbf{$t+2$} & \textbf{$t+3$} & \textbf{$t+4$} & \textbf{$t+5$} & \textbf{$t+6$} & \textbf{$t+7$} & \textbf{$t+8$} & \textbf{$t+9$} & \textbf{$t+10$} & \textbf{$t+11$} \\
+\midrule
+\textbf{Branch}        & A  & B  & A  & C  & A  & D  & C  & A  & B  & A  & C  \\
+\textbf{Initial State} & 10 & 00 &    & 11 &    & 01 &    &    &    &    &    \\
+\textbf{Prediction}    &    &    &    &    &    &    &    &    &    &    &    \\
+\textbf{Outcome}       & T  & NT & T  & T  & NT & NT & T  & T  & NT & NT & NT \\
+\textbf{Correct?}      &    &    &    &    &    &    &    &    &    &    &    \\
+\textbf{Updated State} &    &    &    &    &    &    &    &    &    &    &    \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{ii. Total Mispredictions and Misprediction Rate}
+\begin{align*}
+    \text{Total Mispredictions} &= [\text{Fill in}] \\
+    \text{Misprediction Rate} &= \frac{\text{Total Mispredictions}}{11} \times 100\% = [\text{Fill in}]
+\end{align*}
+
+\vspace{8pt}
+\hrule
+\vspace{8pt}
+
+% ---------------------------------------------------------
+% QUESTION 6
+% ---------------------------------------------------------
+\section*{\textcolor{accent}{Question 6: RISC-V Implementation in SystemVerilog}}
+
+\subsection*{Selected Module \& Design Assumptions}
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Selected Module:} [i. RV32I ALU / ii. Forwarding Unit / iii. Hazard Detection Unit]
+    \item \textbf{Assumptions (Inputs, Outputs, Operations):} [State assumptions here.]
+\end{itemize}
+
+\subsection*{Synthesizable SystemVerilog Source \& Testbench}
+\begin{verbatim}
+// Paste synthesizable SystemVerilog module and testbench here
+\end{verbatim}
+
+\end{document}

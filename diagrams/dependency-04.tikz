@@ -1,0 +1,17 @@
+\begin{tikzpicture}[font=\sffamily]
+\matrix [matrix of nodes,
+         nodes={draw, minimum width=2cm, minimum height=0.7cm, anchor=center, align=center},
+         column 1/.style={nodes={text width=5.88cm, align=left}},
+         column sep=-\pgflinewidth,
+         row sep=-\pgflinewidth,
+         nodes in empty cells] (pipeline)
+{
+    |[draw=none]| \textbf{Instruction} & \textbf{C1} & \textbf{C2} & \textbf{C3} & \textbf{C4} & \textbf{C5} & \textbf{C6} & \textbf{C7} & \textbf{C8} & \textbf{C9} & \textbf{C10} & \textbf{C11} & \textbf{C12} & \textbf{C13} \\
+    |[draw=none]| \texttt{lw x5, 0(x2)} & F1 & F2 & ID & EX & M1 & M2 & |[fill=green!30, font=\bfseries]| RW & & & & & & \\
+    |[draw=none]| \texttt{add x20, x21, x22} & & F1 & F2 & ID & EX & M1 & M2 & RW & & & & & \\
+    |[draw=none]| \texttt{nop} & & & F1 & F2 & ID & EX & M1 & M2 & RW & & & & \\
+    |[draw=none]| \texttt{nop} & & & & F1 & F2 & ID & EX & M1 & M2 & RW & & & \\
+    |[draw=none]| \texttt{addi x10, x5, 8} & & & & & F1 & F2 & |[fill=green!30, font=\bfseries]| ID & EX & M1 & M2 & RW & & \\
+    |[draw=none]| \texttt{sub x23, x24, x25} & & & & & & F1 & F2 & ID & EX & M1 & M2 & RW & \\
+};
+\end{tikzpicture}

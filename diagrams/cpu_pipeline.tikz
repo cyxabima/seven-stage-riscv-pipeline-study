@@ -1,0 +1,85 @@
+\begin{tikzpicture}[
+    font=\sffamily,
+    >=Stealth,
+    stage/.style={draw, rectangle, minimum width=1.5cm, minimum height=1.1cm, align=center},
+    preg/.style={draw, rectangle, minimum width=0.25cm, minimum height=1.8cm, fill=white},
+    longpreg/.style={draw, rectangle, minimum width=0.25cm, minimum height=4.5cm, fill=white},
+    arr/.style={->, thick}
+]
+
+% Nodes - Main sequential path up to ID
+\node[stage] (F1) at (0,0) {F1};
+\node[preg] (PR1) at (1.1,0) {};
+\node[stage] (F2) at (2.2,0) {F2};
+\node[preg] (PR2) at (3.3,0) {};
+\node[stage] (ID) at (4.4,0) {ID};
+\node[preg] (PR3) at (5.5,0) {};
+
+% Top Branch (Integer / Data Memory)
+\node[stage] (EX) at (7.5, 1.5) {EX};
+\node[preg] (PR4T) at (9.0, 1.5) {};
+\node[stage] (M1) at (10.5, 1.5) {M1};
+\node[preg] (PR5T) at (12.0, 1.5) {};
+\node[stage] (M2) at (13.5, 1.5) {M2};
+
+% Bottom Branch (FP Add/Sub/Multiply)
+\node[stage] (EX1) at (7.5, -1.5) {EX-1};
+\node[preg] (PR4B) at (9.0, -1.5) {};
+\node[stage] (EX2) at (10.5, -1.5) {EX-2};
+\node[preg] (PR5B) at (12.0, -1.5) {};
+\node[stage] (EX3) at (13.5, -1.5) {EX-3};
+
+% Join Register and RW Stage
+\node[longpreg] (PR6) at (15.2, 0) {};
+\node[stage] (RW) at (16.5, 0) {RW};
+
+% Horizontal Edges (Fetch / Decode)
+\draw[arr] (F1) -- (PR1);
+\draw[arr] (PR1) -- (F2);
+\draw[arr] (F2) -- (PR2);
+\draw[arr] (PR2) -- (ID);
+\draw[arr] (ID) -- (PR3);
+
+% Split Edges
+\draw[thick] (PR3.east) -- ++(0.4,0) coordinate (split);
+\draw[arr] (split) |- (EX.west);
+\draw[arr] (split) |- (EX1.west);
+
+% Top Branch Edges
+\draw[arr] (EX) -- (PR4T);
+\draw[arr] (PR4T) -- (M1);
+\draw[arr] (M1) -- (PR5T);
+\draw[arr] (PR5T) -- (M2);
+
+% Bottom Branch Edges
+\draw[arr] (EX1) -- (PR4B);
+\draw[arr] (PR4B) -- (EX2);
+\draw[arr] (EX2) -- (PR5B);
+\draw[arr] (PR5B) -- (EX3);
+
+% Join Edges
+\draw[arr] (M2.east) -- (M2.east -| PR6.west);
+\draw[arr] (EX3.east) -- (EX3.east -| PR6.west);
+\draw[arr] (PR6.east) -- (RW.west);
+
+% Labels and Brackets
+% Instruction Fetch Bracket
+\draw[thick] ([xshift=-2mm, yshift=1cm]F1.north west) -- ([xshift=-2mm, yshift=1.15cm]F1.north west) 
+          -- ([xshift=2mm, yshift=1.15cm]F2.north east) -- ([xshift=2mm, yshift=1cm]F2.north east);
+\node[above, yshift=1.15cm] at (1.1,0) {Instruction Fetch};
+
+% Decode Bracket
+\draw[thick] ([xshift=-2mm, yshift=1cm]ID.north west) -- ([xshift=-2mm, yshift=1.15cm]ID.north west) 
+          -- ([xshift=2mm, yshift=1.15cm]ID.north east) -- ([xshift=2mm, yshift=1cm]ID.north east);
+\node[above, yshift=1.15cm] at (4.4,0) {Decode};
+
+% Data Memory Bracket
+\draw[thick] ([xshift=-2mm, yshift=1cm]M1.north west) -- ([xshift=-2mm, yshift=1.15cm]M1.north west) 
+          -- ([xshift=2mm, yshift=1.15cm]M2.north east) -- ([xshift=2mm, yshift=1cm]M2.north east);
+\node[above, yshift=1.15cm] at (12.0,1.5) {Data Memory};
+
+% Text Labels (No Brackets)
+\node[above, align=center, yshift=0.9cm] at (7.5,1.5) {Integer Add/Sub \\ Ld/St \& Branch};
+\node[below, yshift=-0.9cm] at (10.5,-1.5) {FP Add/Sub/Multiply};
+
+\end{tikzpicture}

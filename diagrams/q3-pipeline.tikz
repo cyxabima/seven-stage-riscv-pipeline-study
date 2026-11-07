@@ -1,0 +1,20 @@
+\begin{tikzpicture}[font=\sffamily]
+\matrix [matrix of nodes,
+         nodes={draw, minimum width=2cm, minimum height=0.7cm, anchor=center, align=center},
+         column 1/.style={nodes={text width=5.88cm, align=left}},
+         column sep=-\pgflinewidth,
+         row sep=-\pgflinewidth,
+         nodes in empty cells] (pipeline)
+{
+    |[draw=none]| \textbf{Instruction} & \textbf{C1} & \textbf{C2} & \textbf{C3} & \textbf{C4} & \textbf{C5} & \textbf{C6} & \textbf{C7} & \textbf{C8} & \textbf{C9} & \textbf{C10} & \textbf{C11} & \textbf{C12} & \textbf{C13} & \textbf{C14} & \textbf{C15} \\
+    |[draw=none]| \texttt{fadd f2, f4, f6} & F1 & F2 & ID & EX1 & EX2 & EX3 & |[fill=green!30, font=\bfseries]| RW & & & & & & & & \\
+    |[draw=none]| \texttt{nop} & & F1 & F2 & ID & EX & M1 & M2 & RW & & & & & & & \\
+    |[draw=none]| \texttt{nop} & & & F1 & F2 & ID & EX & M1 & M2 & RW & & & & & & \\
+    |[draw=none]| \texttt{nop} & & & & F1 & F2 & ID & EX & M1 & M2 & RW & & & & & \\
+    |[draw=none]| \texttt{fsub f2, f2, f4} & & & & & F1 & F2 & |[fill=green!30, font=\bfseries]| ID & EX1 & EX2 & EX3 & |[fill=green!30, font=\bfseries]| RW & & & & \\
+    |[draw=none]| \texttt{nop} & & & & & & F1 & F2 & ID & EX & M1 & M2 & RW & & & \\
+    |[draw=none]| \texttt{nop} & & & & & & & F1 & F2 & ID & EX & M1 & M2 & RW & & \\
+    |[draw=none]| \texttt{nop} & & & & & & & & F1 & F2 & ID & EX & M1 & M2 & RW & \\
+    |[draw=none]| \texttt{fmul f8, f2, f10}& & & & & & & & & F1 & F2 & |[fill=green!30, font=\bfseries]| ID & EX1 & EX2 & EX3 & RW \\
+};
+\end{tikzpicture}
