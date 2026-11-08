@@ -8,7 +8,7 @@
     arr/.style={->, semithick},
     ctrl/.style={->, semithick, dashed},
     lbl/.style={font=\scriptsize, fill=white, inner sep=1pt},
-    pin/.style={font=\tiny, anchor=west, inner sep=0pt}
+    pin/.style={font=\tiny, anchor=south east, inner sep=1pt}
 ]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -43,7 +43,7 @@
 
 % mux input numbering
 \foreach \y/\t in {11.025/00,10.675/01,10.325/10,9.975/11,9.225/00,8.875/01,8.525/10,8.175/11}
-  \node[pin] at (3.53, \y) {\t};
+  \node[pin] at (3.42, \y) {\t};
 
 % ID/EX operands into input 00
 \draw (2.2, 9.225) -- (2.2, 11.025);
@@ -102,7 +102,7 @@
 \node[blk]  (ex3) at (12.9, 3.2) {EX-3};
 
 \foreach \y/\t in {3.9/0,3.5/1,2.9/0,2.5/1}
-  \node[pin] at (3.53, \y) {\t};
+  \node[pin] at (3.42, \y) {\t};
 
 \draw[arr] (idexfp.east) -- (2.2, 3.2);
 \draw (2.2, 2.9) -- (2.2, 3.9);

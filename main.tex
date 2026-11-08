@@ -64,6 +64,8 @@
     \textbf{Student 1 Name:} Ukasha & \textbf{Seat No:} CS024115 \\
     \midrule
     \textbf{Student 2 Name:} Abdullah Baig& \textbf{Seat No:} CS-24123 \\
+    \midrule
+    \multicolumn{2}{@{}l}{\textbf{Section:} C} \\
     \bottomrule
 \end{tabularx}
 
@@ -73,7 +75,7 @@
 \begin{figure}[htbp]
     \centering
 
-    \input{diagrams/cpu_pipeline.tikz}
+    \resizebox{\textwidth}{!}{\input{diagrams/cpu_pipeline.tikz}}
 
     \caption{Seven-Stage CPU Pipeline Architecture}
     \label{fig:cpu-pipeline}
@@ -576,17 +578,17 @@ The FP forwarding unit also receives \texttt{PendingA} and \texttt{PendingB} fro
 % ---------------------------------------------------------
 \section*{\textcolor{accent}{Question 4: Hazard Detection Unit}}
 
-Full forwarding removes the ordinary ALU--ALU hazards, but it cannot remove two cases. A load produces its data at the end of \texttt{M2}, so the value is only in the shared write-back register \texttt{M2/RW} when the consumer would need it in \texttt{EX}. An FP ALU instruction produces its result at the end of \texttt{EX3}, so its value is also only in \texttt{M2/RW} when the consumer would need it in \texttt{EX1}. In both cases the consumer must be held in \texttt{ID} until the producer reaches \texttt{RW}. The HDU detects these cases in \texttt{ID} and inserts bubbles; it never stalls an instruction that has already entered \texttt{EX} or \texttt{EX1}.
+Full forwarding removes the ordinary ALU--ALU hazards but not load-use or FP-ALU hazards. A load's data is available only at the end of \texttt{M2}, and an FP result only at the end of \texttt{EX3}; in both cases the consumer needs the value in \texttt{EX} or \texttt{EX1} while it exists only in the shared write-back register \texttt{M2/RW}. The HDU therefore holds the consumer in \texttt{ID} until the producer reaches \texttt{RW}, inserting NOPs but never stalling an instruction already in \texttt{EX} or \texttt{EX1}.
 
 \subsection*{i. Instruction Sequence Requiring a Stall (with Full Forwarding)}
 
 \textbf{Sequence:} \texttt{lw x5, 0(x2)} $\rightarrow$ \texttt{add x6, x5, x1}.
 
-\texttt{add} needs \texttt{x5} in \texttt{EX}. Without a stall it would be in \texttt{EX} in C5, while \texttt{lw} is only in \texttt{M1}; the load data is not ready until \texttt{lw} reaches \texttt{RW} in C7. The HDU therefore holds \texttt{add} in \texttt{ID} for C5 and C6. \texttt{add} enters \texttt{EX} in C7, in the same cycle that \texttt{lw} writes \texttt{x5}, and the \texttt{M2/RW}$\rightarrow$\texttt{EX} forwarding path supplies the value.
+\texttt{add} needs \texttt{x5} in \texttt{EX}. Unstalled it would reach \texttt{EX} in C5, when \texttt{lw} is only in \texttt{M1}, and the load value is not ready until \texttt{RW} in C7. The HDU holds \texttt{add} in \texttt{ID} for C5--C6; it enters \texttt{EX} in C7, as \texttt{lw} writes \texttt{x5}, and the \texttt{M2/RW}$\rightarrow$\texttt{EX} path forwards the value.
 
 \showdiag{q4-load-use}
 
-\textbf{Other unavoidable cases.} The same alignment argument gives the stall counts below. ``Independent'' means an instruction that neither reads nor writes the producer's destination.
+\textbf{Other unavoidable cases.} The same timing gives the stall counts below; ``independent'' means an instruction that neither reads nor writes the producer's destination.
 
 \begin{center}
 \small
@@ -603,73 +605,63 @@ integer ALU $\rightarrow$ integer ALU & 0 & 0 & 0 \\
 \end{tabular}
 \end{center}
 
-The \texttt{lw}$\rightarrow$\texttt{sw} row uses the \texttt{ForwardB} path from \texttt{M2/RW} to \texttt{EX}, that is, the value after the \texttt{MemToReg} mux. With that path, the store data is forwarded exactly like an ALU operand, so the row is 2/1/0. If the design has no store-data path from that write-back value to \texttt{EX} and the store must instead wait for the load to write back and re-read the register file, the row becomes 3/2/1/0 stalls. We use the 2/1/0 result because Question 3's full forwarding already includes the \texttt{M2/RW}$\rightarrow$\texttt{EX} path.
-
-The FP rows have the same shape because the FP result is not available until the end of \texttt{EX3}; only the shared \texttt{RW} value can be forwarded to \texttt{EX1}. Integer ALU results need no stalls at all because they are available at the end of \texttt{EX} and can be forwarded from \texttt{EX/M1}, \texttt{M1/M2}, or \texttt{M2/RW} to \texttt{EX}.
+The \texttt{lw}$\rightarrow$\texttt{sw} row also uses the \texttt{M2/RW}$\rightarrow$\texttt{EX} (\texttt{ForwardB}) path, so store data forwards like an ALU operand; without that path the row would become 3/2/1/0. The FP rows have the same shape because an FP result reaches only \texttt{RW} in time for \texttt{EX1}. Integer ALU producers need no stalls: their results are available at the end of \texttt{EX} and can be forwarded from \texttt{EX/M1}, \texttt{M1/M2}, or \texttt{M2/RW}.
 
 \subsection*{ii. Hazard Detection Unit (HDU) Stall Conditions \& Held Registers}
 
-\textbf{Notation.} The consumer is in \texttt{ID}, so its source registers are the fields of \texttt{IF/ID}. A producer in \texttt{ID/EX} is in \texttt{EX} this cycle, a producer in \texttt{EX/M1} is in \texttt{M1}, a producer in \texttt{ID/EX1} is in \texttt{EX1}, and a producer in \texttt{EX1/EX2} is in \texttt{EX2}. The control unit supplies valid bits $V_1,V_2$ for the integer source ports and $VF_1,VF_2$ for the FP source ports; unused ports are masked. It also supplies \texttt{usesInt} and \texttt{usesFP}, which are both true for \texttt{fsw} because its base register is integer and its store data is FP. We carry \texttt{FPWrite} alongside \texttt{RegWrite}, \texttt{Rd}, and \texttt{MemRead} in \texttt{EX/M1} and \texttt{M1/M2}; this bit lets the HDU distinguish \texttt{lw} from \texttt{flw} and does not change the forwarding equations of Question 3.
+\textbf{Notation.} The consumer is in \texttt{ID}, so its sources are the fields of \texttt{F2/ID}. A producer in \texttt{ID/EX} is in \texttt{EX} this cycle, one in \texttt{EX/M1} is in \texttt{M1}, one in \texttt{ID/EX1} is in \texttt{EX1}, and one in \texttt{EX1/EX2} is in \texttt{EX2}. The control unit supplies valid bits $V_1,V_2,VF_1,VF_2$ (masking unused ports) and \texttt{usesInt}/\texttt{usesFP}; both are true for \texttt{fsw}, whose base is integer and store data is FP. We carry \texttt{FPWrite} with \texttt{RegWrite}, \texttt{Rd}, and \texttt{MemRead} in \texttt{EX/M1} and \texttt{M1/M2} to distinguish \texttt{lw} from \texttt{flw}; this does not change Question 3's forwarding equations.
 
 \begin{align*}
-\text{IntMatch}(D) &= (D=\texttt{IF/ID.Rs1}\land V_1)\lor(D=\texttt{IF/ID.Rs2}\land V_2),\\
-\text{FPMatch}(D) &= (D=\texttt{IF/ID.Fs1}\land VF_1)\lor(D=\texttt{IF/ID.Fs2}\land VF_2).
+\text{IntMatch}(D) &= (D=\texttt{F2/ID.Rs1}\text{ and } V_1)\text{ or }(D=\texttt{F2/ID.Rs2}\text{ and } V_2),\\
+\text{FPMatch}(D) &= (D=\texttt{F2/ID.Fs1}\text{ and } VF_1)\text{ or }(D=\texttt{F2/ID.Fs2}\text{ and } VF_2).
 \end{align*}
 
 \textbf{1. Integer load-use hazard:}
 \begin{align*}
 \text{Stall}_{\text{lw}} &=
-\big[\texttt{ID/EX.MemRead}\land\neg\texttt{ID/EX.FPWrite}
-\land\texttt{ID/EX.Rd}\neq0\\
-&\qquad\land\text{IntMatch}(\texttt{ID/EX.Rd})\big]\\
-&\quad\lor\big[\texttt{EX/M1.MemRead}\land\neg\texttt{EX/M1.FPWrite}
-\land\texttt{EX/M1.Rd}\neq0\\
-&\qquad\land\text{IntMatch}(\texttt{EX/M1.Rd})\big].
+\big[\texttt{ID/EX.MemRead}\text{ and }\neg\texttt{ID/EX.FPWrite}
+\text{ and }\texttt{ID/EX.Rd}\neq0\\
+&\qquad\text{ and }\text{IntMatch}(\texttt{ID/EX.Rd})\big]\\
+&\quad\text{ or }\big[\texttt{EX/M1.MemRead}\text{ and }\neg\texttt{EX/M1.FPWrite}
+\text{ and }\texttt{EX/M1.Rd}\neq0\\
+&\qquad\text{ and }\text{IntMatch}(\texttt{EX/M1.Rd})\big].
 \end{align*}
 
 \textbf{2. FP load-use hazard (\texttt{flw}):}
 \begin{align*}
 \text{Stall}_{\text{flw}} &=
-\big[\texttt{ID/EX.MemRead}\land\texttt{ID/EX.FPWrite}
-\land\text{FPMatch}(\texttt{ID/EX.Rd})\big]\\
-&\quad\lor\big[\texttt{EX/M1.MemRead}\land\texttt{EX/M1.FPWrite}
-\land\text{FPMatch}(\texttt{EX/M1.Rd})\big].
+\big[\texttt{ID/EX.MemRead}\text{ and }\texttt{ID/EX.FPWrite}
+\text{ and }\text{FPMatch}(\texttt{ID/EX.Rd})\big]\\
+&\quad\text{ or }\big[\texttt{EX/M1.MemRead}\text{ and }\texttt{EX/M1.FPWrite}
+\text{ and }\text{FPMatch}(\texttt{EX/M1.Rd})\big].
 \end{align*}
 There is no $\texttt{Rd}\neq0$ check here because \texttt{flw} writes an FP register and \texttt{f0} is a normal register.
 
 \textbf{3. FP ALU hazard:}
 \begin{align*}
 \text{Stall}_{\text{fp}} &=
-\big[\texttt{ID/EX1.RegWrite}\land\texttt{ID/EX1.FPWrite}
-\land\text{FPMatch}(\texttt{ID/EX1.Fd})\big]\\
-&\quad\lor\big[\texttt{EX1/EX2.RegWrite}\land\texttt{EX1/EX2.FPWrite}
-\land\text{FPMatch}(\texttt{EX1/EX2.Fd})\big].
+\big[\texttt{ID/EX1.RegWrite}\text{ and }\texttt{ID/EX1.FPWrite}
+\text{ and }\text{FPMatch}(\texttt{ID/EX1.Fd})\big]\\
+&\quad\text{ or }\big[\texttt{EX1/EX2.RegWrite}\text{ and }\texttt{EX1/EX2.FPWrite}
+\text{ and }\text{FPMatch}(\texttt{EX1/EX2.Fd})\big].
 \end{align*}
 
 \textbf{4. Combined stall signal and register controls:}
 \begin{align*}
-\text{Stall} &= (\texttt{usesInt}\land\text{Stall}_{\text{lw}})
-\lor\big(\texttt{usesFP}\land(\text{Stall}_{\text{flw}}\lor\text{Stall}_{\text{fp}})\big),\\
+\text{Stall} &= (\texttt{usesInt}\text{ and }\text{Stall}_{\text{lw}})
+\text{ or }\big(\texttt{usesFP}\text{ and }(\text{Stall}_{\text{flw}}\text{ or }\text{Stall}_{\text{fp}})\big),\\
 \texttt{PCWrite} &= \neg\text{Stall},\\
-\texttt{IF/IDWrite} &= \neg\text{Stall},\\
-\texttt{ID/EXFlush} &= \text{Stall}\land\texttt{IntPath},\\
-\texttt{ID/EX1Flush} &= \text{Stall}\land\texttt{FPPath},\\
-\texttt{BufferWrite} &= \text{Stall}\land\neg\texttt{BufferValid},\\
-\texttt{BufferRead} &= \texttt{BufferValid}\land\neg\text{Stall}.
+\texttt{F2/IDWrite} &= \neg\text{Stall},\\
+\texttt{ID/EXNOP} &= \text{Stall}\text{ and }\texttt{IntPath},\\
+\texttt{ID/EX1NOP} &= \text{Stall}\text{ and }\texttt{FPPath},\\
+\texttt{BufferWrite} &= \text{Stall}\text{ and }\neg\texttt{BufferValid},\\
+\texttt{BufferRead} &= \texttt{BufferValid}\text{ and }\neg\text{Stall}.
 \end{align*}
-Here \texttt{IntPath} means the consumer will execute through the integer \texttt{EX} path (integer ALU, \texttt{lw}, \texttt{sw}, \texttt{flw}, \texttt{fsw}, or a branch); \texttt{FPPath} means it will execute through \texttt{EX1} (an FP ALU instruction). For \texttt{fsw} both source types are checked, but only \texttt{ID/EXFlush} is asserted because \texttt{fsw} uses the integer memory path. Since a consumer uses exactly one execution path, at most one of the two flush signals is asserted in a cycle, so the HDU inserts at most one bubble per clock cycle. The buffer is written only on the first stall cycle and is drained after the stall, so \texttt{BufferValid} never exceeds one entry.
+Here \texttt{IntPath} covers the integer execution path (integer ALU, \texttt{lw}, \texttt{sw}, \texttt{flw}, \texttt{fsw}, or branch) and \texttt{FPPath} covers \texttt{EX1} (FP ALU). For \texttt{fsw} both source types are checked, but only \texttt{ID/EXNOP} is asserted because \texttt{fsw} uses the integer memory path. Exactly one execution path is taken, so at most one NOP signal is asserted and at most one NOP is inserted per cycle. The buffer is written on the first stall cycle and drained afterwards, so \texttt{BufferValid} never holds more than one entry.
 
-\textbf{Why no other terms are needed.}
-\begin{itemize}[noitemsep, topsep=2pt]
-    \item If a load is in \texttt{M1/M2} (that is, in \texttt{M2}), the next cycle it is in \texttt{M2/RW} and the consumer enters \texttt{EX}; the forwarding unit's \texttt{RW} path supplies the data. Therefore \texttt{M1/M2} must not stall.
-    \item If an FP result is in \texttt{EX2/EX3} (that is, in \texttt{EX3}), the next cycle it is in \texttt{RW} and the consumer enters \texttt{EX1}; again the \texttt{RW} path is sufficient. Therefore \texttt{EX2/EX3} must not stall.
-    \item If the producer is already in \texttt{M2/RW}, the register file write happens at the beginning of the cycle, before the \texttt{ID} read, so the consumer reads the new value directly. It also does not need a stall.
-    \item An integer ALU producer needs no term: its result is forwarded from \texttt{EX/M1} when the consumer is immediately after it, from \texttt{M1/M2} with one instruction between, and from \texttt{M2/RW} with two instructions between.
-    \item A destination of \texttt{x0} never causes a stall because \texttt{x0} is hardwired to zero. \texttt{f0} is a real destination and is not masked.
-\end{itemize}
-This also explains why the FP forwarding unit's \texttt{PendingA}/\texttt{PendingB} check from Question 3 is only a safety check: the HDU does not let the consumer enter \texttt{EX1} until the newest matching FP writer is in \texttt{RW}, so the \texttt{RW} value is not stale.
+\textbf{Why no other terms are needed.} An instruction in \texttt{M1/M2} or \texttt{EX2/EX3} reaches \texttt{RW} next cycle, when the consumer enters \texttt{EX} or \texttt{EX1}, so the \texttt{RW} path suffices and neither register stalls. A producer already in \texttt{M2/RW} writes the register file before the \texttt{ID} read, so no stall is needed. Integer ALU results are forwarded from \texttt{EX/M1}, \texttt{M1/M2}, or \texttt{M2/RW} with 0, 1, or 2 instructions between. Finally, \texttt{x0} is hardwired to zero and never stalls, whereas \texttt{f0} is a real destination and is not masked. This is also why the FP unit's \texttt{PendingA}/\texttt{PendingB} check is only a safety check: the HDU keeps the consumer out of \texttt{EX1} until the newest FP writer is in \texttt{RW}.
 
-\textbf{Store data.} For \texttt{sw}, \texttt{Rs2} is the store-data operand and is included in $\text{IntMatch}$ through $V_2$. Because \texttt{ForwardB} can select the \texttt{M2/RW} value in \texttt{EX}, an \texttt{lw}$\rightarrow$\texttt{sw} dependency behaves like an ALU consumer: 2 stalls immediately after the load, 1 with one independent instruction, and 0 with two. This is the reason the table above uses 2/1/0 for the store case. For \texttt{fsw}, the integer base register is covered by $\text{Stall}_{\text{lw}}$ and the FP data register by $\text{FPMatch}$; if the FP forwarding unit also drives the store-data mux, the same 2/1/0 rule applies. If it does not, the FP store data must wait for writeback, which adds one stall.
+\textbf{Store data.} For \texttt{sw}, \texttt{Rs2} is the store-data operand and is included in $\text{IntMatch}$ through $V_2$; because \texttt{ForwardB} can select \texttt{M2/RW} in \texttt{EX}, the dependency behaves like an ALU consumer (2/1/0). For \texttt{fsw}, the integer base is covered by $\text{Stall}_{\text{lw}}$ and the FP data by $\text{FPMatch}$; the same 2/1/0 rule applies if the FP forwarding unit drives the store-data mux, otherwise FP store data waits for writeback and needs one extra stall.
 
 \textbf{CPU pipeline registers during a stall.}
 \begin{center}
@@ -680,28 +672,28 @@ This also explains why the FP forwarding unit's \texttt{PendingA}/\texttt{Pendin
 \textbf{Register} & \textbf{Action} & \textbf{Reason} \\
 \midrule
 \texttt{PC} & hold (\texttt{PCWrite = 0}) & keep the \texttt{PC} at C, the address the memory keeps presenting \\
-\texttt{IF/ID} & hold (\texttt{IF/IDWrite = 0}) & keep the consumer and its \texttt{IF/ID.PC} in \texttt{ID} \\
+\texttt{F2/ID} & hold (\texttt{F2/IDWrite = 0}) & keep the consumer and its \texttt{F2/ID.PC} in \texttt{ID} \\
 \texttt{Fetch buffer} & write once, then hold & save B and B.PC before \texttt{F2} is overwritten by C \\
-\texttt{ID/EX} & insert bubble (\texttt{ID/EXFlush = 1}) & clear the control fields of the instruction that would enter \texttt{EX} \\
-\texttt{ID/EX1} & insert bubble (\texttt{ID/EX1Flush = 1}) & clear the control fields of the instruction that would enter \texttt{EX1} \\
+\texttt{ID/EX} & insert NOP (\texttt{ID/EXNOP = 1}) & clear the control fields of the instruction that would enter \texttt{EX} \\
+\texttt{ID/EX1} & insert NOP (\texttt{ID/EX1NOP = 1}) & clear the control fields of the instruction that would enter \texttt{EX1} \\
 \texttt{EX/M1}, \texttt{M1/M2}, \texttt{M2/RW} & advance normally & older integer instructions must drain \\
 \texttt{EX1/EX2}, \texttt{EX2/EX3} & advance normally & older FP instructions must drain \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Clearing \texttt{ID/EX} takes effect at the end of the cycle, so it does not disturb the instruction currently in \texttt{EX}: that instruction drives \texttt{EX} for the whole cycle and latches its result into \texttt{EX/M1} at the same clock edge. The clear only removes the control fields of the instruction that would have followed it, which is the consumer that must remain in \texttt{ID}. This is a stall bubble, not a branch flush; the fetch buffer is the only new storage, and it holds B for the duration of the stall.
+Clearing \texttt{ID/EX} takes effect at the end of the cycle, so the instruction currently in \texttt{EX} is undisturbed: it drives \texttt{EX} for the whole cycle and latches its result into \texttt{EX/M1} at the same edge. Only the following instruction's control fields are cleared, which keeps the consumer in \texttt{ID}. This inserts a NOP, not a branch flush; the fetch buffer is the only new storage.
 
-\textbf{External instruction memory and the single-entry fetch buffer.} The \texttt{F1}/\texttt{F2} registers are internal to the external instruction memory, so the CPU cannot hold them with \texttt{PCWrite}; they are therefore not drawn in Figure iii. The CPU instead keeps its own copy of the address: the PC is clocked through \texttt{F1/PC} and \texttt{F2/PC}, so it arrives in \texttt{IF/ID.PC} together with its instruction. Branch targets are computed from \texttt{IF/ID.PC}, never from the live fetch \texttt{PC}, because the live \texttt{PC} is already ahead of the instruction in \texttt{ID}.
+\textbf{External instruction memory and the single-entry fetch buffer.} The instruction memory's own pipeline registers are hidden and are not named here. The \texttt{F1} and \texttt{F2} registers drawn in Figure iii are CPU-side fetch registers that carry the PC so that it is not lost as the instruction advances. Branch targets come from \texttt{F2/ID.PC}, not the live fetch \texttt{PC}, which is already ahead of \texttt{ID}.
 
-When the HDU detects a stall, the consumer A is in \texttt{IF/ID} and the next instruction B is in \texttt{F2}. At that moment the live \texttt{PC} still holds C's address, the instruction after B. The HDU freezes the \texttt{PC} at C, so the memory keeps presenting C, and only B is about to be overwritten when C moves into \texttt{F2}. A \emph{single-entry} fetch buffer therefore saves B and B's PC. C does not have to be saved because the held \texttt{PC} still points to it; for a longer stall the memory simply keeps presenting C, so the buffer never needs a second entry.
+When a stall is detected, consumer A is in \texttt{F2/ID} and B is in the \texttt{F2} fetch stage, while the live \texttt{PC} still holds C. Freezing the \texttt{PC} at C keeps the memory presenting C, and only B is about to be overwritten as C enters the \texttt{F2} stage. A single-entry buffer therefore saves just B and B.PC; C needs no copy because the held \texttt{PC} still points to it, and for a longer stall the memory simply keeps presenting C.
 
 \begin{center}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lcccc >{\raggedright\arraybackslash}p{4.2cm}@{}}
 \toprule
-\textbf{Cycle} & \texttt{IF/ID} & \texttt{F2} & \texttt{PC} & \textbf{Buffer} & \textbf{Action at next edge} \\
+\textbf{Cycle} & \texttt{F2/ID} & \texttt{F2} & \texttt{PC} & \textbf{Buffer} & \textbf{Action at next edge} \\
 \midrule
 t   & A & B & C & empty & stall detected; save B and B.PC \\
 t+1 & A & C & C & B & C re-presented; stall continues \\
@@ -712,15 +704,15 @@ t+4 & C & C+4 & C+8 & empty & C+4 enters \texttt{ID} \\
 \end{tabular}
 \end{center}
 
-The table lists the state during each cycle; the listed action completes at the end of that cycle. Thus B is saved only once, C is not duplicated, and no instruction is lost or fetched twice; the fetch stream is not restarted. When B drains from the buffer, \texttt{IF/ID.PC} takes the saved B.PC; otherwise it takes \texttt{F2/PC}. The buffer is controlled by
+The table gives the state during each cycle; each action completes at the end of that cycle. B is saved once, C is not duplicated, and no instruction is lost or fetched twice. When B drains, \texttt{F2/ID.PC} takes the saved B.PC; otherwise it takes the PC from \texttt{F2}. The buffer is controlled by
 \[
-\texttt{BufferWrite} = \texttt{Stall}\land\neg\texttt{BufferValid},
+\texttt{BufferWrite} = \texttt{Stall}\text{ and }\neg\texttt{BufferValid},
 \qquad
-\texttt{BufferRead} = \texttt{BufferValid}\land\neg\texttt{Stall},
+\texttt{BufferRead} = \texttt{BufferValid}\text{ and }\neg\texttt{Stall},
 \]
-so it is written on the first stall cycle and read out after the stall. A separate \texttt{BufferFlush} input clears the entry when a branch redirects the fetch stream.
+so it is written on the first stall cycle and read after the stall; \texttt{BufferFlush} clears the entry on a branch redirect.
 
-\textbf{Stall bubble versus branch flush.} The \texttt{ID/EXFlush} and \texttt{ID/EX1Flush} signals above only insert a bubble: they clear the control fields of the instruction that would have moved into \texttt{EX} or \texttt{EX1}, while the consumer stays in \texttt{ID}. They do not discard valid work. A branch flush is different: it clears the fetch buffer valid bit (and the younger fetch registers) and loads the \texttt{PC} with the branch target. It is not asserted for a load-use stall.
+\textbf{Stall NOP versus branch flush.} \texttt{ID/EXNOP} and \texttt{ID/EX1NOP} only clear the control fields of the instruction that would enter \texttt{EX} or \texttt{EX1}, while the consumer stays in \texttt{ID}; no valid work is discarded. A branch flush is different: it clears the buffer valid bit and younger fetch registers and loads the \texttt{PC} with the branch target. It is not asserted for a load-use stall.
 
 \subsection*{iii. ID-Stage and Hazard Detection Unit Interface}
 
@@ -728,26 +720,24 @@ so it is written on the first stall cycle and read out after the stall. A separa
 
 \textbf{Inputs.}
 \begin{itemize}[noitemsep, topsep=2pt]
-    \item \texttt{IF/ID.Rs1}, \texttt{IF/ID.Rs2}, \texttt{IF/ID.Fs1}, \texttt{IF/ID.Fs2}: the consumer's source registers, together with the valid bits $V_1,V_2,VF_1,VF_2$ and the decoded \texttt{usesInt}/\texttt{usesFP} flags.
-    \item \texttt{IF/ID.PC}: the consumer's own address, carried alongside the instruction through the CPU-side shadow registers \texttt{F1/PC} and \texttt{F2/PC}, or taken from the fetch buffer when B drains. The branch adder uses this saved value for PC-relative targets. The live fetch \texttt{PC} is not used for branch addressing because it is already ahead of the instruction in \texttt{ID}.
-    \item \texttt{BufferValid}: the single-entry fetch buffer's valid bit. The HDU uses it to write B only once on the first stall cycle.
-    \item \texttt{ID/EX} and \texttt{EX/M1}: \texttt{MemRead}, \texttt{RegWrite}, \texttt{FPWrite}, and \texttt{Rd}. These detect an integer load in \texttt{EX} or \texttt{M1} and an \texttt{flw} in \texttt{EX} or \texttt{M1}.
-    \item \texttt{ID/EX1} and \texttt{EX1/EX2}: \texttt{RegWrite}, \texttt{FPWrite}, and \texttt{Fd}. These detect an FP ALU result in \texttt{EX1} or \texttt{EX2}.
-    \item \texttt{M1/M2}, \texttt{EX2/EX3}, and \texttt{M2/RW}: the same destination and control fields. They are shown for completeness but deliberately create no stall term: an instruction in \texttt{M2} or \texttt{EX3} reaches \texttt{RW} in the next cycle, so the \texttt{RW} forwarding path is already sufficient.
+    \item \texttt{F2/ID.Rs1}, \texttt{F2/ID.Rs2}, \texttt{F2/ID.Fs1}, \texttt{F2/ID.Fs2}: consumer sources, with $V_1,V_2,VF_1,VF_2$ and \texttt{usesInt}/\texttt{usesFP}.
+    \item \texttt{F2/ID.PC}: consumer address, carried through the CPU-side \texttt{F1} and \texttt{F2} registers, or from the buffer when B drains; it supplies PC-relative branch targets because the live \texttt{PC} is ahead of \texttt{ID}.
+    \item \texttt{BufferValid}: lets the HDU write B only once on the first stall cycle.
+    \item \texttt{ID/EX}, \texttt{EX/M1}: \texttt{MemRead}, \texttt{RegWrite}, \texttt{FPWrite}, \texttt{Rd}; these detect an integer load or \texttt{flw} in \texttt{EX}/\texttt{M1}.
+    \item \texttt{ID/EX1}, \texttt{EX1/EX2}: \texttt{RegWrite}, \texttt{FPWrite}, \texttt{Fd}; these detect an FP ALU result in \texttt{EX1}/\texttt{EX2}.
+    \item \texttt{M1/M2}, \texttt{EX2/EX3}, \texttt{M2/RW}: the same fields, shown for completeness; they create no stall because an instruction there reaches \texttt{RW} next cycle.
 \end{itemize}
 
 \textbf{Outputs.}
 \begin{itemize}[noitemsep, topsep=2pt]
-    \item \texttt{PCWrite}: enables the \texttt{PC}; cleared during a stall so the \texttt{PC} stays at C, the address the memory keeps presenting. After the stall it resumes from C and advances to C+4; it is not reloaded from \texttt{IF/ID.PC}.
-    \item \texttt{IF/IDWrite}: enables the \texttt{IF/ID} register; cleared during a stall so the consumer stays in \texttt{ID}.
-    \item \texttt{ID/EXFlush}: clears the integer \texttt{ID/EX} control fields, inserting a bubble.
-    \item \texttt{ID/EX1Flush}: clears the FP \texttt{ID/EX1} control fields, inserting a bubble.
-    \item \texttt{BufferWrite}: captures the instruction in \texttt{F2} and its PC on the first stall cycle.
-    \item \texttt{BufferRead}: drains the saved instruction and PC into \texttt{IF/ID} after the stall.
-    \item \texttt{BufferFlush}: clears the buffer valid bit on a branch redirect; it is not asserted for a load-use stall.
+    \item \texttt{PCWrite}: holds the \texttt{PC} at C during a stall, then resumes C$\rightarrow$C+4; it is not reloaded from \texttt{F2/ID.PC}.
+    \item \texttt{F2/IDWrite}: holds the consumer in \texttt{ID}.
+    \item \texttt{ID/EXNOP}, \texttt{ID/EX1NOP}: clear the integer/FP control fields, inserting a NOP.
+    \item \texttt{BufferWrite}, \texttt{BufferRead}: capture B and B.PC on the first stall cycle, then drain them into \texttt{F2/ID}.
+    \item \texttt{BufferFlush}: clears the buffer on a branch redirect, not on a load-use stall.
 \end{itemize}
 
-\textbf{Timing example (the sequence from part i).} In C4, \texttt{lw} is in \texttt{EX} and \texttt{add} is in \texttt{ID}. The HDU sees \texttt{ID/EX.MemRead = 1}, \texttt{ID/EX.Rd = 5}, and \texttt{IF/ID.Rs1 = 5}, so $\text{Stall}_{\text{lw}}=1$ and \texttt{Stall}=1. It holds \texttt{PC} and \texttt{IF/ID}, writes the \texttt{F2} instruction into the fetch buffer, and clears \texttt{ID/EX}. In C5 the load has moved to \texttt{EX/M1}, so the second bracket of $\text{Stall}_{\text{lw}}$ is true and the stall repeats; the buffer already holds B, so it is not rewritten. In C6 the load is in \texttt{M1/M2} (that is, in \texttt{M2}); no stall term is true, so the buffer drains B into \texttt{ID}, \texttt{add} enters \texttt{EX} in C7, and it receives the \texttt{M2/RW} value through the forwarding unit. The HDU itself is purely combinational; the single-entry fetch buffer is separate storage that the HDU merely controls.
+\textbf{Timing example (part i).} In C4, \texttt{lw} is in \texttt{EX} and \texttt{add} in \texttt{ID}; \texttt{ID/EX.MemRead = 1}, \texttt{ID/EX.Rd = 5}, and \texttt{F2/ID.Rs1 = 5}, so $\text{Stall}_{\text{lw}}=\text{Stall}=1$. The HDU holds \texttt{PC} and \texttt{F2/ID}, saves the instruction at the \texttt{F2} stage in the buffer, and clears \texttt{ID/EX}. In C5 the load is in \texttt{EX/M1}, so the second bracket keeps the stall asserted, but the buffer already holds B. In C6 the load is in \texttt{M1/M2}, no term is true, B drains into \texttt{ID}, and \texttt{add} enters \texttt{EX} in C7 to receive the \texttt{M2/RW} value. The HDU is purely combinational; the buffer is separate storage that it controls.
 
 \vspace{8pt}
 \hrule
