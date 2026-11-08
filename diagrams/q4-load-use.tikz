@@ -1,0 +1,25 @@
+\begin{tikzpicture}[font=\sffamily]
+\matrix [matrix of nodes,
+         nodes={draw, minimum width=1.55cm, minimum height=0.7cm, anchor=center, align=center},
+         column 1/.style={nodes={text width=5.1cm, align=left}},
+         column sep=-\pgflinewidth,
+         row sep=-\pgflinewidth,
+         nodes in empty cells] (pipeline)
+{
+    |[draw=none]| \textbf{Instruction} & \textbf{C1} & \textbf{C2} & \textbf{C3} & \textbf{C4} & \textbf{C5} & \textbf{C6} & \textbf{C7} & \textbf{C8} & \textbf{C9} & \textbf{C10} \\
+    |[draw=none]| \texttt{lw x5, 0(x2)}   & F1 & F2 & ID & EX & M1 & M2 & |[fill=green!30, font=\bfseries]| RW & & & \\
+    |[draw=none]| \texttt{add x6, x5, x1} & & F1 & F2 & ID & |[fill=orange!35, font=\bfseries]| ID & |[fill=orange!35, font=\bfseries]| ID & |[fill=green!30, font=\bfseries]| EX & M1 & M2 & RW \\
+};
+
+% Forwarding arrow from the load's write-back to the consumer's EX stage.
+\draw[-{Latex[length=1.6mm]}, thick, draw=accent]
+    ([yshift=1pt]pipeline-2-8.south) -- ([yshift=-1pt]pipeline-3-8.north);
+\node[anchor=west, font=\sffamily\scriptsize, text=accent]
+    at ([xshift=3pt]pipeline-2-8.east) {\texttt{M2/RW} $\rightarrow$ \texttt{EX}};
+
+\node[anchor=north west, yshift=-3mm, font=\sffamily\small, align=left]
+    at (pipeline.south west)
+    {Orange cells: \texttt{add} is held in \texttt{ID} for two stall cycles (C5 and C6).\\
+     \texttt{stall} is asserted while \texttt{lw} is in \texttt{EX} and \texttt{M1} (C4 and C5).\\
+     Green cells: in C7 \texttt{lw} writes \texttt{x5} and \texttt{add} reads the forwarded value.};
+\end{tikzpicture}

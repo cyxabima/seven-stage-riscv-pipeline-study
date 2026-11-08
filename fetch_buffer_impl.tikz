@@ -1,0 +1,62 @@
+\begin{tikzpicture}[
+  font=\scriptsize,
+  blk/.style={draw, rectangle, align=center, inner sep=3pt, fill=white},
+  reg/.style={draw, thick, rectangle, align=center, inner sep=3pt, fill=gray!25},
+  mux/.style={draw, rounded corners=3pt, minimum width=0.9cm, minimum height=2.4cm, align=center, fill=white},
+  ctrl/.style={draw, very thick, rounded corners=2pt, align=left, inner sep=6pt, fill=gray!8},
+  bus/.style={-{Latex[length=1.8mm]}, very thick},
+  sig/.style={-{Latex[length=1.8mm]}, semithick},
+  cs/.style={-{Latex[length=1.8mm]}, semithick, ctc},
+  lb/.style={font=\tiny, inner sep=1pt, align=left}
+]
+% ---------------- data path ----------------
+\node[blk, minimum height=1.0cm] (f2) at (-0.4,5.0) {F2 output\\[-1pt]{\tiny \{instr, PC\}}};
+\node[reg, minimum width=2.6cm, minimum height=1.3cm] (br) at (5.0,5.0)
+  {Buffer register\\[-1pt]{\tiny \{instr[31:0], PC[31:0]\}, 64 bits}};
+\node[mux] (mx) at (9.6,5.0) {mux};
+\node[blk, minimum width=1.7cm, minimum height=1.0cm] (ifid) at (12.2,5.0) {IF/ID\\[-1pt]{\tiny \{instr, PC\}}};
+
+\coordinate (tap) at (2.5,5.0);
+\draw[bus] (f2.east) -- (br.west);
+\fill (tap) circle (1.2pt);
+\draw[bus] (tap) -- (2.5,6.4) -- (8.7,6.4) -- (8.7,5.9) -- (mx.west |- 0,5.9);
+\node[lb, above] at (5.6,6.4) {bypass (64)};
+\draw[bus] (br.east) -- (mx.west |- 0,5.0);
+\draw[bus] (7.7,4.1) -- (mx.west |- 0,4.1);
+\node[lb, anchor=east] at (7.65,4.1) {NOP};
+\draw[bus] (mx.east) -- (ifid.west);
+
+% clock triangle on buffer register
+\draw (4.0,4.35) -- ++(0.14,0.13) -- ++(-0.14,0.13);
+
+% ---------------- controller ----------------
+\node[ctrl, minimum width=6.0cm, minimum height=2.3cm] (ct) at (6.8,1.2) {%
+  \textbf{Fetch-buffer controller} (combinational)\\[3pt]
+  $\mathit{Push}=\mathit{F2v}\wedge\mathit{Stall}\wedge\neg\mathit{Full}\wedge\neg\mathit{Flush}$\\
+  $\mathit{Pop}=\neg\mathit{Stall}\wedge\mathit{Full}\wedge\neg\mathit{Flush}$\\
+  $\mathit{Full}^{+}=\neg\mathit{Flush}\wedge\bigl(\mathit{Push}\vee(\mathit{Full}\wedge\neg\mathit{Pop})\bigr)$\\
+  $\mathit{IF/ID.Write}=\neg\mathit{Stall}\vee\mathit{Flush}$\\
+  $\mathit{Sel}$: \textsc{nop} if $\mathit{Flush}\vee\neg(\mathit{Full}\vee\mathit{F2v})$;
+  \textsc{buf} if $\mathit{Full}$; else \textsc{f2}};
+
+% inputs
+\draw[sig] (1.4,1.8) -- (ct.west |- 0,1.8); \node[lb, anchor=east] at (1.35,1.8) {\texttt{F2v}};
+\draw[sig] (1.4,1.2) -- (ct.west |- 0,1.2); \node[lb, anchor=east] at (1.35,1.2) {\texttt{Stall} (HDU)};
+\draw[sig] (1.4,0.6) -- (ct.west |- 0,0.6); \node[lb, anchor=east] at (1.35,0.6) {\texttt{Flush} (HDU)};
+
+% Full flip-flop
+\node[reg, minimum width=2.0cm, minimum height=0.9cm] (ff) at (13.0,0.7) {\textbf{Full}\\[-1pt]{\tiny 1-bit FF}};
+\draw (12.0,0.25) -- ++(0.13,0.12) -- ++(-0.13,0.12);
+\draw[sig] (ct.east |- 0,0.7) -- node[lb, above]{$\mathit{Full}^{+}$ (D)} (ff.west);
+\draw[sig] (ff.south) -- (13.0,-0.8) -- (6.8,-0.8) -- node[lb, below]{$\mathit{Full}$ (Q, fed back)} (ct.south);
+
+% controller outputs (red)
+\draw[cs] (5.0,2.35) -- node[lb, right]{$\mathit{Push}$ = write enable} (br.south |- 0,4.35);
+\draw[cs] (9.6,2.35) -- node[lb, right]{$\mathit{Sel}$} (mx.south);
+\draw[cs] (ct.east |- 0,1.8) -- (12.2,1.8) -- node[lb, right]{\texttt{IF/ID.Write}} (ifid.south);
+
+% legend
+\draw[bus] (0,-1.9) -- (0.8,-1.9); \node[lb, anchor=west] at (0.9,-1.9) {64-bit data};
+\draw[sig] (3.0,-1.9) -- (3.8,-1.9); \node[lb, anchor=west] at (3.9,-1.9) {1-bit signal};
+\draw[cs] (6.0,-1.9) -- (6.8,-1.9); \node[lb, anchor=west] at (6.9,-1.9) {control output};
+\end{tikzpicture}

@@ -1,0 +1,177 @@
+\begin{tikzpicture}[
+  font=\scriptsize,
+  blk/.style={draw, rectangle, minimum height=0.9cm, align=center, inner sep=2pt, fill=white},
+  reg/.style={draw, thick, rectangle, minimum width=1.5cm, minimum height=0.8cm, align=center, fill=gray!20, inner sep=2pt},
+  unobs/.style={draw, dashed, gray, rectangle, minimum width=1.5cm, minimum height=0.8cm, align=center, text=gray, inner sep=2pt},
+  buf/.style={draw, thick, rectangle, minimum width=2.0cm, minimum height=1.3cm, align=center, fill=gray!12, inner sep=2pt},
+  mux/.style={draw, rounded corners=2pt, minimum width=1.1cm, minimum height=1.6cm, align=center, fill=white, inner sep=1pt},
+  hdu/.style={draw, very thick, rounded corners=2pt, minimum width=18.2cm, minimum height=2.0cm, align=center, fill=gray!8},
+  dat/.style={-{Latex[length=1.8mm]}, semithick},
+  hin/.style={-{Latex[length=1.8mm]}, semithick, dashed, draw=accent},
+  ctl/.style={-{Latex[length=1.8mm]}, semithick, thick, draw=red!65!black},
+  lb/.style={font=\tiny, inner sep=1pt, fill=white, align=left},
+  ll/.style={font=\tiny, inner sep=1pt, fill=white, rotate=90, anchor=south, align=center},
+  note/.style={font=\tiny, text=muted, inner sep=1pt, align=left}
+]
+
+% ------------------------------------------------------------------
+% Fetch path.  The instruction and its PC travel as one {instr, PC}
+% bundle from the tap to the mux; only one mux is needed.
+% ------------------------------------------------------------------
+\node[blk, minimum width=1.4cm] (pc) at (0,5.0) {PC};
+\node[blk, minimum width=2.6cm, minimum height=1.0cm] (imem) at (2.3,5.0)
+  {Instruction memory};
+
+\node[buf] (buf) at (4.6,3.2)
+  {Fetch buffer\\[-1pt]{\tiny 1 entry}\\[-1pt]{\tiny \{instr, PC\}}};
+
+\node[mux] (mx) at (6.5,5.0)
+  {2:1\\[-1pt]{\tiny \{instr,PC\}}};
+
+\node[blk, minimum width=1.4cm, minimum height=1.5cm] (ifid) at (7.95,5.0)
+  {IF/ID\\[-1pt]{\tiny instr, PC}};
+
+% PC feeds the memory address and the CPU-side PC shadow
+\draw[dat] (pc.east) -- (imem.west);
+
+% CPU-side PC shadow: PC -> F1/PC -> F2/PC -> {instr, PC} bundle
+\node[blk, minimum width=1.3cm] (f1pc) at (1.3,6.3) {F1/PC};
+\node[blk, minimum width=1.4cm] (f2pc) at (3.0,6.3) {F2/PC};
+
+\draw[dat] (pc.north) -- (0,6.3) -- (f1pc.west);
+\draw[dat] (f1pc.east) -- (f2pc.west);
+\draw[dat] (f2pc.east) -- (4.0,6.3) -- (4.0,5.0);
+
+% Join the instruction and its PC at one tap
+\draw[dat] (imem.east) -- (4.0,5.0);
+\coordinate (tap) at (4.0,5.0);
+\fill (tap) circle (1pt);
+
+% B is written into the buffer on the first stall cycle
+\draw[dat] (tap) -- (4.0,4.35) -- (4.6,4.35) -- (buf.north);
+
+% Normal fetch bypasses the buffer and enters the mux at its upper port
+\draw[dat] (tap) -- (5.3,5.0) -- (5.3,5.25) -- (5.95,5.25);
+\node[note, anchor=south] at (4.6,5.05) {bypass};
+
+% The buffer drains into the mux at its lower port
+\draw[dat] (buf.east) -- (5.7,3.2) -- (5.7,4.55) -- (5.95,4.55);
+
+% One mux selects the whole {instr, PC} bundle
+\draw[dat] (mx.east) -- (ifid.west);
+\draw[dat] (ifid.east) -- (8.925,5.0);
+
+% ------------------------------------------------------------------
+% ID stage and the two execution pipelines
+% ------------------------------------------------------------------
+\node[blk, minimum width=2.55cm, minimum height=1.25cm] (id) at (10.2,5.0)
+  {ID\\[-1pt]{\tiny decode, \texttt{usesInt}/\texttt{usesFP}}\\[-1pt]{\tiny Int RF / FP RF}};
+
+\node[reg] (idex)   at (12.5,5.55) {ID/EX};
+\node[reg] (idex1)  at (12.5,4.35) {ID/EX1};
+\node[reg] (exm1)   at (14.2,5.55) {EX/M1};
+\node[reg] (ex1ex2) at (14.2,4.35) {EX1/EX2};
+\node[unobs] (m1m2)   at (15.9,5.55) {M1/M2};
+\node[unobs] (ex2ex3) at (15.9,4.35) {EX2/EX3};
+\node[unobs, minimum width=1.2cm, minimum height=2.0cm] (m2rw) at (17.35,4.95) {M2/RW};
+
+% ID output splits into the integer and FP pipelines
+\draw[dat] (id.east) -- (11.6,5.0);
+\draw[dat] (11.6,5.0) -- (11.6,5.55) -- (11.75,5.55);
+\draw[dat] (11.6,5.0) -- (11.6,4.35) -- (11.75,4.35);
+
+% Pipeline registers advance along each row.  Both rows enter the tall
+% shared RW block at their own height, so there are no diagonal jogs.
+\draw[dat] (idex.east) -- (exm1.west);
+\draw[dat] (exm1.east) -- (m1m2.west);
+\draw[dat] (m1m2.east) -- (16.75,5.55);
+\draw[dat] (idex1.east) -- (ex1ex2.west);
+\draw[dat] (ex1ex2.east) -- (ex2ex3.west);
+\draw[dat] (ex2ex3.east) -- (16.75,4.35);
+
+% ------------------------------------------------------------------
+% Hazard Detection Unit
+% ------------------------------------------------------------------
+\node[hdu] (hdu) at (9.0,-1.85) {%
+  \textbf{Hazard Detection Unit} (combinational)\\[1pt]
+  $\mathit{Stall}=\mathit{Stall}_{\mathrm{lw}}\vee\mathit{Stall}_{\mathrm{flw}}\vee\mathit{Stall}_{\mathrm{fp}}$\quad
+  $\texttt{PCWrite}=\texttt{IF/IDWrite}=\neg\mathit{Stall}$\\[1pt]
+  $\texttt{ID/EXFlush}=\mathit{Stall}\wedge\mathit{IntPath}$\quad
+  $\texttt{ID/EX1Flush}=\mathit{Stall}\wedge\mathit{FPPath}$};
+
+% ------------------------------------------------------------------
+% HDU inputs: consumer fields, buffer valid, producer fields
+% ------------------------------------------------------------------
+% Consumer's source fields from IF/ID
+\draw[hin] (8.4,4.25) -- (8.4,-0.85);
+\node[lb, anchor=west] at (8.55,1.5)
+  {\texttt{Rs1}, \texttt{Rs2}, \texttt{Fs1}, \texttt{Fs2}\\
+   $V_1,V_2,VF_1,VF_2$\\
+   \texttt{usesInt}, \texttt{usesFP}};
+
+% Buffer valid bit
+\draw[hin] (5.2,2.55) -- (5.2,-0.85);
+
+% Producer fields from the pipeline registers
+\draw[hin] (17.35,3.95) -- (17.35,-0.85);
+\node[lb, anchor=east, font=\fontsize{5}{6}\selectfont] at (16.9,1.5)
+  {\texttt{ID/EX}, \texttt{EX/M1}:\\
+   \ \texttt{MemRead}, \texttt{RegWrite},\\
+   \ \texttt{FPWrite}, \texttt{Rd}\\
+   \texttt{ID/EX1}, \texttt{EX1/EX2}:\\
+   \ \texttt{RegWrite}, \texttt{FPWrite}, \texttt{Fd}\\
+   \texttt{M1/M2}, \texttt{EX2/EX3},\\
+   \ \texttt{M2/RW}: no term};
+
+% ------------------------------------------------------------------
+% HDU control outputs.  Every route is orthogonal and each signal
+% has its own wire; the buffer signals are not merged.
+% ------------------------------------------------------------------
+% PCWrite: hold the PC
+\draw[ctl] (0,-0.85) -- (0,4.55);
+\node[ll] at (0.35,1.6) {\texttt{PCWrite}};
+
+% IF/IDWrite: hold the consumer in ID
+\draw[ctl] (7.5,-0.85) -- (7.5,4.25);
+\node[ll] at (7.3,1.6) {\texttt{IF/IDWrite}};
+
+% BufferWrite: save B once
+\draw[ctl] (3.7,-0.85) -- (3.7,2.55);
+\node[ll] at (3.5,1.6) {\texttt{BufferWrite}};
+
+% BufferFlush: clear the entry on a branch redirect
+\draw[ctl] (4.3,-0.85) -- (4.3,2.55);
+\node[ll] at (4.1,1.6) {\texttt{BufferFlush}};
+
+% BufferRead: mux select
+\draw[ctl] (6.5,-0.85) -- (6.5,4.2);
+\node[ll] at (6.3,1.6) {\texttt{BufferRead}\\[-1pt]{\tiny(mux Sel)}};
+
+% ID/EX1Flush: bubble into the FP pipeline
+\draw[ctl] (12.5,-0.85) -- (12.5,3.95);
+\node[ll] at (12.45,1.6) {\texttt{ID/EX1Flush}};
+
+% ID/EXFlush: bubble into the integer pipeline.  The wire goes up the
+% free right-hand side and over the top of the register file, so it
+% never crosses a datapath wire or a register label.
+\draw[ctl] (18.05,-0.85) -- (18.05,6.25) -- (12.5,6.25) -- (12.5,5.95);
+\node[lb, anchor=south] at (15.2,6.3) {\texttt{ID/EXFlush}};
+
+% ------------------------------------------------------------------
+% Notes and legend
+% ------------------------------------------------------------------
+\node[note, anchor=south] at (7.95,5.85)
+  {\texttt{IF/ID.PC} $\rightarrow$ branch target adder};
+
+\draw[dat] (-0.2,-3.5) -- (0.6,-3.5);
+\node[font=\tiny, anchor=west] at (0.65,-3.5) {datapath};
+\draw[hin] (2.9,-3.5) -- (3.7,-3.5);
+\node[font=\tiny, anchor=west] at (3.75,-3.5) {HDU input};
+\draw[ctl] (6.0,-3.5) -- (6.8,-3.5);
+\node[font=\tiny, anchor=west] at (6.85,-3.5) {HDU control output};
+\node[reg, minimum width=0.6cm, minimum height=0.25cm, inner sep=0pt] at (11.0,-3.5) {};
+\node[font=\tiny, anchor=west] at (11.35,-3.5) {observed: stall term};
+\node[unobs, minimum width=0.6cm, minimum height=0.25cm, inner sep=0pt] at (15.6,-3.5) {};
+\node[font=\tiny, anchor=west] at (15.95,-3.5) {not used for stall};
+
+\end{tikzpicture}

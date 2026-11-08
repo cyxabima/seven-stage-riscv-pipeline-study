@@ -1,0 +1,114 @@
+\begin{tikzpicture}[
+    font=\sffamily\small,
+    >=Stealth,
+    blk/.style={draw, rectangle, rounded corners=2pt, minimum width=1.4cm, minimum height=0.9cm, align=center, fill=white},
+    preg/.style={draw, rectangle, minimum width=1.5cm, minimum height=1.05cm, align=center, fill=gray!10},
+    mux/.style={draw, rectangle, minimum width=1.4cm, minimum height=1.4cm, align=center, fill=orange!12},
+    fu/.style={draw, rectangle, rounded corners=2pt, minimum width=12.0cm, minimum height=1.8cm, align=left, fill=blue!7, inner sep=4pt},
+    arr/.style={->, thick},
+    ctrl/.style={->, thick, dashed, blue!70!black},
+    lbl/.style={font=\scriptsize, fill=white, inner sep=1pt}
+]
+
+% ============================================================
+% (a) INTEGER FORWARDING INTERFACE
+% ============================================================
+\node[font=\bfseries] at (7.5, 12.3) {(a) Integer forwarding interface};
+
+\node[preg] (idex) at (1.5, 9.6) {ID/EX\\[-1pt]\scriptsize Rs1, Rs2\\ReadData1\\ReadData2};
+\node[mux]  (muxA) at (4.0, 10.4) {4:1\\MUX A};
+\node[mux]  (muxB) at (4.0, 8.8) {4:1\\MUX B};
+\node[blk, minimum height=1.8cm] (alu) at (6.3, 9.6) {ALU};
+\node[preg] (exm1) at (8.6, 9.6) {EX/M1\\[-1pt]\scriptsize RegWrite, Rd\\MemRead\\ALUResult};
+\node[preg] (m1m2) at (10.8, 9.6) {M1/M2\\[-1pt]\scriptsize RegWrite, Rd\\MemRead\\ALUResult};
+\node[preg] (rwA) at (13.0, 9.6) {RW (shared)\\[-1pt]\scriptsize RegWrite, Dest\\FPWrite, Data};
+\node[lbl] at (13.0, 10.5) {\scriptsize shared with (b)};
+
+% Integer datapath
+\draw[arr] (idex.east) -- ++(0.45,0) |- (muxA.west);
+\draw[arr] (idex.east) -- ++(0.45,0) |- (muxB.west);
+\draw[arr] (muxA.east) -- (alu.west |- muxA.east);
+\draw[arr] (muxB.east) -- (alu.west |- muxB.east);
+\draw[arr] (alu.east) -- (exm1.west);
+\draw[arr] (exm1.east) -- (m1m2.west);
+\draw[arr] (m1m2.east) -- (rwA.west);
+\node[lbl, above] at (1.5, 10.45) {read data};
+
+% Integer forwarding unit
+\node[fu] (ifu) at (7.5, 6.2) {%
+    \textbf{Integer Forwarding Unit}\\[1pt]
+    \scriptsize
+    in: \texttt{EX/M1.RegWrite, Rd, MemRead}, \texttt{M1/M2.RegWrite, Rd, MemRead}\\
+    \hspace*{0.55em}\texttt{RW.RegWrite, Dest, FPWrite=0}, \texttt{ID/EX.Rs1, Rs2}\\
+    out: \texttt{ForwardA[1:0]} $\rightarrow$ MUX A select, \texttt{ForwardB[1:0]} $\rightarrow$ MUX B select
+};
+
+% Control inputs to the forwarding unit
+\draw[ctrl] (exm1.south) -- (exm1.south |- ifu.north);
+\draw[ctrl] (m1m2.south) -- (m1m2.south |- ifu.north);
+\draw[ctrl] (rwA.south) -- (rwA.south |- ifu.north);
+\draw[ctrl] (idex.south) -- (idex.south |- ifu.north);
+\node[lbl, right] at (8.7, 8.7) {\scriptsize control fields};
+\node[lbl, right] at (10.9, 8.7) {\scriptsize control fields};
+\node[lbl, right] at (13.1, 8.7) {\scriptsize control fields};
+\node[lbl, right] at (1.6, 8.5) {\scriptsize Rs1, Rs2};
+
+% Select lines from the forwarding unit to the muxes (top/bottom of each mux)
+\draw[ctrl] (ifu.west) -- (2.4, 6.2) -- (2.4, 11.35) -- (4.0, 11.35) -- (muxA.north);
+\draw[ctrl] (ifu.west) -- (2.6, 6.2) -- (2.6, 7.7) -- (4.0, 7.7) -- (muxB.south);
+\node[lbl, left] at (2.3, 10.9) {\scriptsize ForwardA[1:0]};
+\node[lbl, right] at (2.7, 7.35) {\scriptsize ForwardB[1:0]};
+
+% ============================================================
+% (b) FLOATING-POINT FORWARDING INTERFACE
+% ============================================================
+\node[font=\bfseries] at (7.5, 4.95) {(b) Floating-point forwarding interface};
+
+\node[preg] (idexfp) at (1.5, 3.5) {ID/EX1\\[-1pt]\scriptsize Fs1, Fs2\\ReadData1\\ReadData2};
+\node[mux, minimum height=0.9cm] (fmuxA) at (4.0, 4.0) {2:1\\MUX A};
+\node[mux, minimum height=0.9cm] (fmuxB) at (4.0, 3.0) {2:1\\MUX B};
+\node[blk, minimum height=1.2cm] (ex1) at (6.0, 3.5) {EX1};
+\node[blk]  (ex2)   at (7.7, 3.5) {EX2};
+\node[blk]  (ex3)   at (9.4, 3.5) {EX3};
+\node[mux, minimum width=1.2cm, minimum height=1.2cm] (wbmux) at (11.2, 3.5) {2:1\\MUX};
+\node[preg] (rwB) at (13.25, 3.5) {RW (shared)\\[-1pt]\scriptsize RegWrite, Dest\\FPWrite, Data};
+\node[lbl] at (13.25, 4.35) {\scriptsize shared with (a)};
+
+% FP datapath
+\draw[arr] (idexfp.east) -- ++(0.45,0) |- (fmuxA.west);
+\draw[arr] (idexfp.east) -- ++(0.45,0) |- (fmuxB.west);
+\draw[arr] (fmuxA.east) -- (ex1.west |- fmuxA.east);
+\draw[arr] (fmuxB.east) -- (ex1.west |- fmuxB.east);
+\draw[arr] (ex1.east) -- (ex2.west);
+\draw[arr] (ex2.east) -- (ex3.west);
+\draw[arr] (ex3.east) -- (wbmux.west);
+\draw[arr] (wbmux.east) -- (rwB.west);
+
+% Integer result feeding the shared write-back mux
+\draw[arr] (11.2, 2.45) -- (wbmux.south);
+\node[lbl, left] at (11.05, 2.65) {\scriptsize from \texttt{M2} (integer path)};
+
+% FP forwarding unit
+\node[fu] (ffu) at (7.5, 0.9) {%
+    \textbf{FP Forwarding Unit}\\[1pt]
+    \scriptsize
+    in: \texttt{RW.RegWrite, Dest, FPWrite}, \texttt{ID/EX1.Fs1, Fs2}\\
+    \hspace*{0.55em}\texttt{EX1/EX2.RegWrite, Fd}, \texttt{EX2/EX3.RegWrite, Fd}\\
+    \hspace*{0.55em}\texttt{EX/M1.MemRead, FPWrite, Rd}, \texttt{M1/M2.MemRead, FPWrite, Rd}\\
+    out: \texttt{FP\_ForwardA/B} $\rightarrow$ MUX select\\
+    \hspace*{0.55em}(stalls are owned by the HDU, Q4)
+};
+
+% Control inputs to the FP forwarding unit
+\draw[ctrl] (rwB.south) -- (rwB.south |- ffu.north);
+\draw[ctrl] (idexfp.south) -- (idexfp.south |- ffu.north);
+\node[lbl, right, align=left] at (13.45, 2.3) {\scriptsize \texttt{RegWrite}\\ \texttt{Dest, FPWrite}};
+\node[lbl, right] at (1.6, 2.2) {\scriptsize \texttt{Fs1, Fs2}};
+
+% Select lines from the FP forwarding unit to the muxes (top/bottom of each mux)
+\draw[ctrl] (ffu.north) -- (7.5, 2.25) -- (2.55, 2.25) -- (2.55, 4.45) -- (4.0, 4.45) -- (fmuxA.north);
+\draw[ctrl] (ffu.north) -- (7.5, 2.25) -- (2.75, 2.25) -- (2.75, 2.55) -- (4.0, 2.55) -- (fmuxB.south);
+\node[lbl, left] at (2.45, 4.3) {\scriptsize FP\_ForwardA};
+\node[lbl, left] at (2.65, 2.3) {\scriptsize FP\_ForwardB};
+
+\end{tikzpicture}

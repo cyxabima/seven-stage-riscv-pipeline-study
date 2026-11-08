@@ -9,13 +9,18 @@
          nodes in empty cells] (pipeline)
 {
     |[draw=none]| \textbf{Instruction} & \textbf{C1} & \textbf{C2} & \textbf{C3} & \textbf{C4} & \textbf{C5} & \textbf{C6} & \textbf{C7} & \textbf{C8} & \textbf{C9} & \textbf{C10} & \textbf{C11} & \textbf{C12} & \textbf{C13} \\
-    |[draw=none]| \texttt{flw f31, 32(x10)}  & F2 & F2 & ID & EX & |[fill=red!30, font=\bfseries]| M1 & M2 & RW & & & & & & \\
+    |[draw=none]| \texttt{flw f31, 32(x10)}  & F1 & F2 & ID & EX & |[fill=red!30, font=\bfseries]| M1 & M2 & RW & & & & & & \\
     |[draw=none]| \texttt{fsw f11, 8(x10)}   & & F1 & F2 & ID & EX & |[fill=red!30, font=\bfseries]| M1 & M2 & RW & & & & & \\
     |[draw=none]| \texttt{slli x24, x24, 2}  & & & F1 & F2 & ID & EX & M1* & M2* & RW & & & & \\
     |[draw=none]| \texttt{fsub f11, f31, f13}& & & & F1 & F2 & ID & EX1 & EX2 & EX3 & RW & & & \\
-    |[draw=none]| \texttt{add x10, x10, x24} & & & & & |[fill=red!30, font=\bfseries]| STALL & |[fill=red!30, font=\bfseries]| STALL & F1 & F2 & ID & EX & M1 & M2 & RW \\
-    |[draw=none]| \texttt{blt x24, x5, label}& & & & & & & & F1 & F2 & ID & EX & M1 & M2 \\
+    |[draw=none]| \texttt{add x10, x10, x24} & & & & & |[fill=red!30, font=\bfseries]| STALL & |[fill=red!30, font=\bfseries]| STALL & F1 & F2 & ID & EX & M1* & M2* & RW \\
+    |[draw=none]| \texttt{blt x24, x5, label}& & & & & & & & F1 & F2 & ID & EX & M1* & M2* \\
+    |[draw=none]| \texttt{add x31, x31, x14}& & & & & & & & & F1 & F2 & ID & EX & M1* \\
 };
+
+\node[anchor=north west, yshift=-3mm, font=\sffamily\small, align=left]
+    at (pipeline.south west)
+    {\texttt{M1*}/\texttt{M2*} = pipeline pass-through, no data-memory access.};
 
 
 

@@ -1,0 +1,104 @@
+\documentclass[tikz,border=6pt]{standalone}
+\usepackage{amsmath,amssymb}
+\usetikzlibrary{arrows.meta,calc}
+\definecolor{inc}{HTML}{1F3A7A}
+\definecolor{ctc}{HTML}{9B1C1C}
+
+\begin{document}
+\begin{tikzpicture}[
+  font=\scriptsize,
+  blk/.style={draw, rectangle, minimum height=0.9cm, align=center, inner sep=2pt, fill=white},
+  obs/.style={draw, thick, rectangle, minimum width=1.5cm, minimum height=0.8cm, align=center, fill=gray!20, inner sep=2pt},
+  unobs/.style={draw, dashed, gray, rectangle, minimum width=1.5cm, minimum height=0.8cm, align=center, text=gray, inner sep=2pt},
+  mux/.style={draw, rounded corners=3pt, minimum width=0.8cm, minimum height=1.5cm, align=center, fill=white},
+  buf/.style={draw, rectangle, minimum width=1.6cm, minimum height=1.0cm, align=center, fill=gray!25, inner sep=2pt},
+  hdu/.style={draw, very thick, rounded corners=2pt, minimum width=18.2cm, minimum height=1.5cm, align=center, fill=gray!8},
+  dat/.style={-{Latex[length=1.8mm]}, semithick},
+  hin/.style={-{Latex[length=1.8mm]}, semithick, dashed, inc},
+  ctl/.style={-{Latex[length=1.8mm]}, semithick, ctc},
+  lb/.style={font=\tiny, inner sep=1pt, fill=white, align=left}
+]
+% --- fetch path ---
+\node[blk, minimum width=1.8cm, minimum height=1.1cm] (pc) at (0,4) {PC\\[-1pt]{\tiny next-PC logic}};
+\node[blk, minimum width=3.0cm, minimum height=1.0cm] (imem) at (2.9,4) {Instruction memory\\[-1pt]{\tiny internal stages F1, F2}};
+\node[buf] (buf) at (4.9,2.0) {Fetch buffer\\[-1pt]{\tiny 1 entry: instr, PC}};
+\node[mux] (mx) at (6.8,4) {mux};
+\node[blk, minimum width=1.2cm] (ifid) at (8.5,4) {IF/ID};
+\node[blk, minimum width=2.4cm, minimum height=1.2cm] (id) at (10.8,4) {ID\\[-1pt]{\tiny decode, \texttt{uses\_*}}\\[-1pt]{\tiny Int RF / FP RF}};
+% --- registers after ID ---
+\node[obs] (idex)   at (14.1,4.4) {ID/EX};
+\node[obs] (idex1)  at (14.1,3.6) {ID/EX1};
+\node[obs] (exm1)   at (16.1,4.4) {EX/M1};
+\node[obs] (ex1ex2) at (16.1,3.6) {EX1/EX2};
+\node[unobs] (m1m2)   at (18.1,4.4) {M1/M2};
+\node[unobs] (ex2ex3) at (18.1,3.6) {EX2/EX3};
+\node[unobs, minimum height=1.8cm] (m2rw) at (20.1,4.0) {M2/RW\\EX3/RW};
+\node[blk, minimum width=3.2cm] (bru) at (14.1,6.4) {Branch resolution (EX)\\[-1pt]{\tiny \texttt{BranchTaken}, \texttt{TargetPC}}};
+
+% datapath
+\draw[dat] (pc.east) -- (imem.west);
+\coordinate (tap) at (4.9,4);
+\draw[dat] (imem.east) -- node[lb, above=1pt, fill=none]{bypass} (mx.west);
+\fill (tap) circle (1pt);
+\draw[dat] (tap) -- node[lb, right=1pt, fill=none]{push} (buf.north);
+\draw[dat] (buf.east) -- (6.5,2.0) -- node[lb, left=1pt, fill=none]{pop} (6.5,3.25);
+\draw[dat] (mx.east) -- (ifid.west);
+\draw[dat] (ifid.east) -- (id.west);
+\coordinate (sp) at (12.35,4);
+\draw[dat] (id.east) -- (sp);
+\draw[dat] (sp) |- (idex.west);
+\draw[dat] (sp) |- (idex1.west);
+\draw[dat] (idex.east) -- (exm1.west);
+\draw[dat] (idex1.east) -- (ex1ex2.west);
+\draw[dat] (exm1.east) -- (m1m2.west);
+\draw[dat] (ex1ex2.east) -- (ex2ex3.west);
+\draw[dat] (m1m2.east) -- (19.35,4.4);
+\draw[dat] (ex2ex3.east) -- (19.35,3.6);
+
+% HDU tap region
+\draw[inc, dashed, rounded corners=2pt] (13.25,3.0) rectangle (17.0,4.95);
+\node[font=\tiny, inc, anchor=south] at (15.1,4.95) {registers observed by HDU};
+
+% --- HDU ---
+\node[hdu] (hdu) at (8.3,-1.6) {\textbf{Hazard detection unit} (combinational)\\[2pt]
+ $\mathit{Stall}=\mathit{Stall}_{int}\vee\mathit{Stall}_{fp}$,\quad $\mathit{Flush}=\mathit{BranchTaken}$,\quad $\mathit{PCWrite}=\neg\mathit{Stall}$};
+
+% HDU inputs
+\draw[hin] (ifid.south) ++(0.3,0) -- (8.8,-0.85);
+\node[lb, anchor=west] at (8.9,1.0) {\texttt{rs1, rs2, fs1, fs2},\\\texttt{uses\_rs1/rs2/fs1/fs2}};
+\draw[hin] (16.1,3.0) -- (16.1,-0.85);
+\node[lb, anchor=west] at (16.2,1.3) {\texttt{ID/EX}, \texttt{ID/EX1}: \texttt{MemRead}, \texttt{RegWrite}, \texttt{rd}/\texttt{fd}\\
+  \texttt{EX/M1}: \texttt{MemRead}, \texttt{RegWrite}, \texttt{rd}/\texttt{fd}\\
+  \texttt{EX1/EX2}: \texttt{RegWrite\_fp}, \texttt{fd}};
+\draw[hin] (3.4,3.5) -- (3.4,-0.85);
+\node[lb, anchor=west] at (3.5,0.2) {\texttt{F2v}};
+\draw[hin] (5.3,1.5) -- (5.3,-0.85);
+\node[lb, anchor=west] at (5.4,0.2) {\texttt{Buf.Full}};
+\draw[hin] (bru.east) -- (21.6,6.4) -- (21.6,-1.6) -- (hdu.east);
+\node[lb, anchor=west] at (21.7,1.5) {\texttt{BranchTaken}};
+
+% target PC straight to PC
+\draw[dat] (bru.west) -- (0,6.4) -- node[lb, above=1pt, fill=none]{\texttt{TargetPC}} (pc.north);
+
+% HDU outputs
+\draw[ctl] (0,-0.85) -- (0,3.45);
+\node[lb, anchor=east] at (-0.1,0.5) {\texttt{PCWrite}};
+\draw[ctl] (2.4,-0.85) -- (2.4,3.5);
+\node[lb, anchor=east] at (2.3,0.5) {\texttt{F1/F2 Kill}};
+\draw[ctl] (4.3,-0.85) -- (4.3,1.5);
+\node[lb, anchor=east] at (4.2,0.2) {\texttt{Buf.Push/Pop/Clear}};
+\draw[ctl] (7.1,-0.85) -- (7.1,3.25);
+\node[lb, anchor=east] at (7.0,1.0) {\texttt{IFID.Sel}};
+\draw[ctl] (8.2,-0.85) -- (8.2,3.55);
+\node[lb, anchor=east] at (8.1,2.8) {\texttt{IF/ID.Write}};
+\draw[ctl] (14.1,-0.85) -- (14.1,3.2);
+\node[lb, anchor=east] at (14.0,1.8) {\texttt{CtrlZero}};
+
+% legend
+\draw[dat] (-0.8,-3.4) -- (0.2,-3.4); \node[lb, anchor=west, fill=none] at (0.3,-3.4) {datapath};
+\draw[hin] (2.2,-3.4) -- (3.2,-3.4); \node[lb, anchor=west, fill=none] at (3.3,-3.4) {HDU input};
+\draw[ctl] (5.2,-3.4) -- (6.2,-3.4); \node[lb, anchor=west, fill=none] at (6.3,-3.4) {HDU output};
+\node[unobs, minimum width=0.6cm, minimum height=0.3cm] at (8.6,-3.4) {};
+\node[lb, anchor=west, fill=none] at (9.0,-3.4) {not observed by HDU};
+\end{tikzpicture}
+\end{document}
