@@ -1,0 +1,48 @@
+\begin{tikzpicture}[
+  font=\scriptsize,
+  reg/.style={draw, thick, rectangle, minimum width=2.8cm, minimum height=1.1cm, align=center, fill=gray!15, inner sep=2pt},
+  ff/.style={draw, thick, rectangle, minimum width=1.5cm, minimum height=0.8cm, align=center, fill=gray!8, inner sep=2pt},
+  gate/.style={draw, thick, rounded corners=1pt, minimum width=1.2cm, minimum height=0.7cm, align=center, fill=white, inner sep=1pt},
+  dat/.style={-{Latex[length=1.8mm]}, semithick},
+  ctl/.style={-{Latex[length=1.8mm]}, semithick, thick, draw=accent},
+  lb/.style={font=\tiny, inner sep=1pt, fill=white, align=center},
+  note/.style={font=\tiny, text=muted, inner sep=1pt, align=center}
+]
+
+% Data register
+\node[reg] (dreg) at (2.8,1.15) {data register\\[-1pt]{\tiny \{instr, PC\}}};
+
+% Input bundle from the F2 tap
+\draw[dat] (-1.1,1.15) -- (dreg.west);
+\node[lb, above] at (0.55,1.18) {\{instr, PC\}};
+\node[note, below] at (0.55,1.10) {from \texttt{F2} tap};
+
+% Output bundle to the fetch mux
+\draw[dat] (dreg.east) -- (6.7,1.15);
+\node[lb, above] at (5.45,1.18) {\{instr, PC\}};
+\node[note, below] at (5.45,1.10) {to fetch mux};
+
+% Write enable
+\draw[ctl] (2.8,2.75) -- (dreg.north);
+\node[lb, anchor=west] at (2.95,2.25) {\texttt{BufferWrite} (WE)};
+
+% Valid flip-flop
+\node[ff] (vff) at (2.8,-0.35) {valid\\[-1pt]{\tiny FF}};
+
+% Set and clear
+\draw[ctl] (-0.6,-0.35) -- (vff.west);
+\node[lb, anchor=south] at (1.0,-0.25) {set = \texttt{BufferWrite}};
+
+\draw[ctl] (6.2,-0.35) -- (vff.east);
+\node[lb, anchor=south] at (4.85,-0.25) {clear = \texttt{BufferFlush}\\or \texttt{BufferClear}};
+
+% Valid bit drives the read-select AND gate
+\node[gate] (ag) at (2.8,-1.8) {AND};
+\draw[dat] (vff.south) -- (ag.north);
+\node[lb, anchor=west] at (2.95,-0.95) {\texttt{BufferValid}};
+\draw[ctl] (-0.6,-1.8) -- (ag.west);
+\node[lb, anchor=south] at (1.0,-1.70) {$\neg$\texttt{Stall}};
+\draw[ctl] (ag.east) -- (6.2,-1.8);
+\node[lb, anchor=south] at (4.85,-1.70) {\texttt{BufferRead} (mux Sel)};
+
+\end{tikzpicture}

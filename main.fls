@@ -371,12 +371,15 @@ INPUT /usr/share/texmf-dist/fonts/tfm/public/cm/cmbx9.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam10.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm10.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/public/cm/cmtt9.tfm
+INPUT ./diagrams/fetch-buffer.tikz
+INPUT ./diagrams/fetch-buffer.tikz
+INPUT diagrams/fetch-buffer.tikz
+INPUT /usr/share/texmf-dist/tex/latex/base/omscmr.fd
+INPUT /usr/share/texmf-dist/tex/latex/base/omscmr.fd
+INPUT /usr/share/texmf-dist/tex/latex/base/omscmr.fd
 INPUT ./diagrams/hdu-interface.tikz
 INPUT ./diagrams/hdu-interface.tikz
 INPUT diagrams/hdu-interface.tikz
-INPUT /usr/share/texmf-dist/tex/latex/base/omscmr.fd
-INPUT /usr/share/texmf-dist/tex/latex/base/omscmr.fd
-INPUT /usr/share/texmf-dist/tex/latex/base/omscmr.fd
 INPUT /usr/share/texmf-dist/fonts/tfm/public/cm/cmti8.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/public/cm/cmti7.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/public/cm/cmti7.tfm
@@ -419,6 +422,7 @@ INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmssbx10.pfb
 INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb
 INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb
 INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb
+INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy9.pfb
 INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb
 INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmti8.pfb
 INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb
