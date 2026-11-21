@@ -109,15 +109,6 @@ Makefile                 build, test, figure, and clean targets
 .github/workflows/ci.yml LaTeX + RTL CI
 ```
 
-`assets/social-preview.png` is a ready-to-use GitHub social preview image.
-
-## GitHub setup checklist
-
-1. Create the repository and push this folder (no remote is configured yet).
-2. In **Settings → General → Social preview**, upload `assets/social-preview.png`.
-3. Add topics: `computer-architecture`, `risc-v`, `rv32i`, `systemverilog`, `pipeline`, `hazard-detection`, `fp-pipeline`, `latex`, `tikz`.
-4. Pin the repository on your profile.
-5. Tag `v1.0` and attach `main.pdf` to a GitHub Release.
 
 ## AI and tool declaration
 
