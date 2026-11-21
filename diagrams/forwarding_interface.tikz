@@ -27,7 +27,7 @@
 
 % join register (shared by (a) and (b)) and RW
 \node[draw, fill=gray!12, minimum width=0.5cm, minimum height=9.65cm] (join) at (14.5, 5.325) {};
-\node[rotate=90, font=\scriptsize] at (join) {Join register (M2/RW, EX3/RW): RegWrite, Dest, FPWrite, Data};
+\node[rotate=90, font=\scriptsize] at (join) {Join register (M2/RW, EX3/RW): RegWrite, Rd, FPWrite, Data};
 \node[blk, minimum width=1.3cm, minimum height=1.1cm] (rw) at (16.3, 5.325) {RW};
 \draw[arr] (join.east |- rw.west) -- (rw.west);
 
@@ -78,7 +78,7 @@
 \node[lbl] at (3.0, 6.9) {Rs1, Rs2};
 \node[lbl, right, align=center] at (8.15, 8.2) {RegWrite, Rd,\\MemRead};
 \node[lbl, right, align=center] at (11.35, 8.2) {RegWrite, Rd,\\MemRead};
-\node[lbl] at (12.2, 6.4) {RegWrite, Dest, FPWrite};
+\node[lbl] at (12.2, 6.4) {RegWrite, Rd, FPWrite};
 
 % outputs
 \draw[ctrl] (6.0, 6.3) -- (0.2, 6.3) -- (0.2, 11.45) -- (4.2, 11.45) -- (muxA.north);
@@ -129,15 +129,9 @@
 
 % inputs
 \draw[ctrl] (idexfp.south) -- (1.2, 0.9) -- (6.0, 0.9);
-\draw[ctrl] (pr1.south) -- (8.1, 1.2);
-\draw[ctrl] (pr2.south) -- (11.3, 0.9) -- (9.0, 0.9);
 \draw[ctrl] (14.25, 0.7) -- (9.0, 0.7);
-\draw[ctrl] (13.5, 0.35) -- (9.0, 0.35);
 \node[lbl] at (3.5, 0.9) {Fs1, Fs2};
-\node[lbl, right] at (8.15, 1.65) {RegWrite, Fd};
-\node[lbl, right] at (11.35, 1.65) {RegWrite, Fd};
-\node[lbl] at (12.2, 0.7) {RegWrite, Dest, FPWrite};
-\node[lbl] at (11.0, 0.35) {PendingA, PendingB};
+\node[lbl] at (12.2, 0.7) {RegWrite, Rd, FPWrite};
 
 % outputs
 \draw[ctrl] (6.0, 0.5) -- (0.2, 0.5) -- (0.2, 4.5) -- (4.2, 4.5) -- (fmuxA.north);

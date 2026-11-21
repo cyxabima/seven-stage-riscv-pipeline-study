@@ -26,15 +26,20 @@
 \draw[ctl] (2.8,2.75) -- (dreg.north);
 \node[lb, anchor=west] at (2.95,2.25) {\texttt{BufferWrite} (WE)};
 
-% Valid flip-flop
+% Valid flip-flop (synchronous D input)
 \node[ff] (vff) at (2.8,-0.35) {valid\\[-1pt]{\tiny FF}};
 
-% Set and clear
+% D input
 \draw[ctl] (-0.6,-0.35) -- (vff.west);
-\node[lb, anchor=south] at (1.0,-0.25) {set = \texttt{BufferWrite}};
+\node[lb, anchor=south] at (1.0,-0.25) {D = \texttt{Stall} $\cdot$\\[-1pt]$\neg$\texttt{BufferFlush}};
 
+% Clear input
 \draw[ctl] (6.2,-0.35) -- (vff.east);
 \node[lb, anchor=south] at (4.85,-0.25) {clear = \texttt{BufferFlush}\\or \texttt{BufferClear}};
+
+% Clock input (from the top)
+\draw[ctl] (2.8,0.45) -- (vff.north);
+\node[lb, anchor=west] at (2.95,0.35) {\texttt{CLK}};
 
 % Valid bit drives the read-select AND gate
 \node[gate] (ag) at (2.8,-1.8) {AND};

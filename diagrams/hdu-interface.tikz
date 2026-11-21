@@ -66,7 +66,7 @@
 % ID stage and the two execution pipelines
 % ------------------------------------------------------------------
 \node[blk, minimum width=2.55cm, minimum height=1.25cm] (id) at (10.2,5.0)
-  {ID\\[-1pt]{\tiny decode, \texttt{usesInt}/\texttt{usesFP}}\\[-1pt]{\tiny Int RF / FP RF}};
+  {ID\\[-1pt]{\tiny decode, source-valid bits}\\[-1pt]{\tiny Int RF / FP RF}};
 
 \node[reg] (idex)   at (12.5,5.55) {ID/EX};
 \node[reg] (idex1)  at (12.5,4.35) {ID/EX1};
@@ -77,9 +77,9 @@
 \node[unobs, minimum width=1.2cm, minimum height=2.0cm] (m2rw) at (17.35,4.95) {M2/RW};
 
 % ID output splits into the integer and FP pipelines
-\draw[dat] (id.east) -- (11.6,5.0);
-\draw[dat] (11.6,5.0) -- (11.6,5.55) -- (11.75,5.55);
-\draw[dat] (11.6,5.0) -- (11.6,4.35) -- (11.75,4.35);
+\draw[dat] (id.east) -- (11.53,5.0);
+\draw[dat] (11.53,5.0) -- (11.53,5.55) -- (11.75,5.55);
+\draw[dat] (11.53,5.0) -- (11.53,4.35) -- (11.75,4.35);
 
 % Pipeline registers advance along each row.  Both rows enter the tall
 % shared RW block at their own height, so there are no diagonal jogs.
@@ -106,26 +106,33 @@
 \draw[hin] (8.4,4.25) -- (8.4,-0.85);
 \node[lb, anchor=west] at (8.55,1.5)
   {\texttt{Rs1}, \texttt{Rs2}, \texttt{Fs1}, \texttt{Fs2}\\
-   $V_1,V_2,VF_1,VF_2$\\
-   \texttt{usesInt}, \texttt{usesFP}};
+   $V_1,V_2,VF_1,VF_2$};
 
 % Buffer valid bit
 \draw[hin] (5.2,2.55) -- (5.2,-0.85);
 
-% Producer fields come from the observed registers only
-% (ID/EX, EX/M1, ID/EX1, EX1/EX2); M1/M2, EX2/EX3, M2/RW are not inputs.
-\draw[hin] (13.35,3.95) -- (13.35,-0.85);
-\node[lb, anchor=east, font=\fontsize{5}{6}\selectfont] at (16.9,1.5)
-  {\texttt{ID/EX}, \texttt{EX/M1}:\\
-   \ \texttt{MemRead}, \texttt{RegWrite},\\
-   \ \texttt{FPWrite}, \texttt{Rd}\\
-   \texttt{ID/EX1}, \texttt{EX1/EX2}:\\
-   \ \texttt{RegWrite}, \texttt{FPWrite}, \texttt{Fd}};
+% Producer fields come from the observed registers only, one path per
+% register.  M1/M2, EX2/EX3 and M2/RW are not inputs.
+\draw[hin] (11.75,5.25) -- (11.67,5.25) -- (11.67,-0.85);
+\node[ll] at (12.05,1.8)
+  {\texttt{ID/EX}: \texttt{MemRead}, \texttt{RegWrite}, \texttt{FPWrite}, \texttt{Rd}};
+
+\draw[hin] (12.15,3.95) -- (12.15,-0.85);
+\node[ll] at (12.53,1.8)
+  {\texttt{ID/EX1}: \texttt{RegWrite}, \texttt{FPWrite}, \texttt{Fd}};
+
+\draw[hin] (14.25,3.95) -- (14.25,-0.85);
+\node[ll] at (14.63,1.8)
+  {\texttt{EX1/EX2}: \texttt{RegWrite}, \texttt{FPWrite}, \texttt{Fd}};
+
+\draw[hin] (14.95,5.25) -- (15.05,5.25) -- (15.05,-0.85);
+\node[ll] at (15.43,1.8)
+  {\texttt{EX/M1}: \texttt{MemRead}, \texttt{RegWrite}, \texttt{FPWrite}, \texttt{Rd}};
 
 % ------------------------------------------------------------------
-% HDU control outputs.  Every route is orthogonal; the two wires
-% carrying Stall are the same zero-control output fanned out to both
-% pipeline registers.  The buffer signals are not merged.
+% HDU control outputs.  Every route is orthogonal.  Stall is a single
+% output fanned out to both pipeline registers.  The buffer signals are
+% not merged.
 % ------------------------------------------------------------------
 % PCWrite: hold the PC
 \draw[ctl] (0,-0.85) -- (0,4.55);
@@ -147,15 +154,14 @@
 \draw[ctl] (6.5,-0.85) -- (6.5,4.2);
 \node[ll] at (6.3,1.6) {\texttt{BufferRead}\\[-1pt]{\tiny(mux Sel)}};
 
-% Stall zeroes the control word entering EX1
-\draw[ctl] (12.5,-0.85) -- (12.5,3.95);
-\node[ll] at (12.45,1.6) {\texttt{Stall}};
-
-% Same Stall output zeroes the control word entering EX.  The wire
-% goes up the free right-hand side and over the top of the register
-% file, so it never crosses a datapath wire or a register label.
-\draw[ctl] (18.05,-0.85) -- (18.05,6.25) -- (12.5,6.25) -- (12.5,5.95);
-\node[lb, anchor=south] at (15.2,6.3) {\texttt{Stall}};
+% One Stall output.  It runs up the free right-hand side, over the top
+% and down the gap between the two register columns, then fans out to
+% the control inputs of both ID/EX and ID/EX1.  One signal, one label.
+\draw[semithick, thick, draw=red!65!black]
+  (18.05,-0.85) -- (18.05,6.25) -- (13.35,6.25) -- (13.35,4.95) -- (12.65,4.95);
+\draw[semithick, thick, draw=red!65!black] (12.65,4.95) -- (12.65,5.15);
+\draw[semithick, thick, draw=red!65!black] (12.65,4.95) -- (12.65,4.75);
+\node[lb, anchor=south] at (14.0,6.35) {\texttt{Stall}};
 
 % ------------------------------------------------------------------
 % Notes and legend

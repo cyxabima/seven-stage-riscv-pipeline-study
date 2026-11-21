@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  latex:
+    name: Build report and figures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile LaTeX report
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: main.tex
+          args: -pdf -interaction=nonstopmode -file-line-error
+
+      - name: Install figure export tools
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
+      - name: Export README figures
+        run: ./scripts/export-figures.sh
+
+      - name: Upload PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: main-pdf
+          path: main.pdf
+
+      - name: Upload figures
+        uses: actions/upload-artifact@v4
+        with:
+          name: readme-figures
+          path: assets/*.png
+
+  rtl:
+    name: Run ALU testbench
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Icarus Verilog
+        run: sudo apt-get update && sudo apt-get install -y iverilog
+
+      - name: Compile and simulate
+        run: |
+          mkdir -p build
+          iverilog -g2012 -o build/alu_tb design.sv testbench.sv
+          vvp build/alu_tb

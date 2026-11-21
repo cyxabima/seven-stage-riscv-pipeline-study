@@ -61,7 +61,7 @@
 \vspace{4pt}
 \begin{tabularx}{\textwidth}{@{}X X@{}}
     \toprule
-    \textbf{Student 1 Name:} Ukasha & \textbf{Seat No:} CS024115 \\
+    \textbf{Student 1 Name:} Ukasha & \textbf{Seat No:} CS-24115 \\
     \midrule
     \textbf{Student 2 Name:} Abdullah Baig& \textbf{Seat No:} CS-24123 \\
     \midrule
@@ -119,7 +119,7 @@
     \item Because both \texttt{M1} and \texttt{F1} use the first stage of the memory, the 5th instruction (\texttt{add}) must stall in \textbf{Cycle 5}.
     \item One stall removes the conflict with \texttt{flw}, but in \textbf{Cycle 6} the 2nd instruction (\texttt{fsw}) enters \texttt{M1}. This causes a second collision with the stalled \texttt{add} instruction trying to enter \texttt{F1}, so \texttt{add} has to stall again in \textbf{Cycle 6} and finally enters \texttt{F1} in \textbf{Cycle 7} (total of \textbf{2 stalls}).
     \item \textbf{Assumption:} Since the unified memory is pipelined into two internal stages (Stage 1 for \texttt{F1}/\texttt{M1} and Stage 2 for \texttt{F2}/\texttt{M2}), Stage 1 and Stage 2 can work in parallel in the same cycle. This means \texttt{fsub} in \texttt{F2} can run alongside \texttt{flw} in \texttt{M1} (Cycle 5), and \texttt{add} in \texttt{F1} can run alongside \texttt{fsw} in \texttt{M2} (Cycle 7) without a second stall per instruction.
-    \item After \texttt{fsw} leaves \texttt{M1} at the end of C6, no instruction uses memory stage 1 for data, so no further structural stalls occur. The 7th instruction (\texttt{add x31, x31, x14}) therefore executes normally; its last stages, and the \texttt{RW} of \texttt{blt}, are omitted only because the table stops at C13.
+    \item After \texttt{fsw} leaves \texttt{M1} at the end of C6, no instruction uses memory stage 1 for data, so no further structural stalls occur. The 7th instruction (\texttt{add x31, x31, x14}) therefore executes normally.
 \end{itemize}
 
 \subsection*{ii. Feasibility of Reducing Stalls via Code Reordering}
@@ -331,11 +331,7 @@
 
 \subsection*{vi. CPI for Each Single-Stage Forwarding Option}
 
-With only one forwarding path active, the \texttt{EX} stage takes $160\text{ ps}$, which matches \texttt{M1} and \texttt{M2}, so the clock cycle stays at $\mathbf{160\text{ ps}}$. There are two ways the Hazard Detection Unit (HDU) can handle instructions whose exact forwarding path is missing. We use \textbf{Assumption A} for all CPI values below and report Assumption B only as a sensitivity check:
-\begin{itemize}[noitemsep, topsep=2pt]
-    \item \textbf{Assumption A (primary):} If a later path (like \texttt{M1/M2} or \texttt{M2/RW}) exists, an earlier dependent instruction stalls only until the producer reaches that forwarding stage. These are the natural minimal-stall results.
-    \item \textbf{Assumption B (sensitivity only):} If the immediate path for an \texttt{EX} producer is missing, it waits until \texttt{RW} (Cycle 7).
-\end{itemize}
+With only one forwarding path active, the \texttt{EX} stage takes $160\text{ ps}$, which matches \texttt{M1} and \texttt{M2}, so the clock cycle stays at $\mathbf{160\text{ ps}}$. We cover only one assumption, \textbf{Assumption A}: if a later path (like \texttt{M1/M2} or \texttt{M2/RW}) exists, an earlier dependent instruction stalls only until the producer reaches that forwarding stage. These are the natural minimal-stall results, and all CPI values below use them.
 
 \textbf{1. Forwarding ONLY from \texttt{EX/M1} to ALU ($T_{\text{clk}} = 160\text{ ps}$):}
 \begin{itemize}[noitemsep, topsep=2pt]
@@ -369,15 +365,6 @@ With only one forwarding path active, the \texttt{EX} stage takes $160\text{ ps}
     \text{CPI}_{\text{M2/RW}} &= 1 + (0.33 \times 1) + (0.67 \times 2) = 1 + 0.33 + 1.34 = \mathbf{2.67}
 \end{align*}
 
-\vspace{4pt}
-\textbf{Sensitivity check (Assumption B):}
-\begin{itemize}[noitemsep, topsep=2pt]
-    \item \textbf{\texttt{M1/M2}-only:} $1 + (0.10 \times 0) + (0.05 \times 1) + (0.18 \times 2) + (0.67 \times 3) = \mathbf{3.42}$. The 0-stall group is \texttt{EX to 2nd Only} (10\%), 1 stall is \texttt{EX to 2nd and 3rd} (5\%), 2 stalls are the \texttt{MEM to 2nd} categories (10\% + 8\% = 18\%), and 3 stalls are all 1st-dependent categories (67\%).
-    \item \textbf{\texttt{M2/RW}-only:} $1 + (0.18 \times 1) + (0.47 \times 2) + (0.35 \times 3) = \mathbf{3.17}$. The 1-stall group is the \texttt{MEM to 2nd} categories (10\% + 8\% = 18\%), 2 stalls are \texttt{EX to 2nd} (15\%) plus \texttt{MEM to 1st} (32\%) $= 47\%$, and 3 stalls are the \texttt{EX to 1st} categories (35\%).
-    \item \textbf{\texttt{EX/M1}-only} is unchanged at $3.07$, because with only that path every later consumer already waits for \texttt{RW}.
-\end{itemize}
-Assumption A remains the primary result and is what the recommendation uses.
-
 \subsection*{vii. Speedup Comparison and Final Recommendation}
 
 To compare the actual execution time per instruction, we multiply $\text{CPI} \times T_{\text{clk}}$ and compare against the No-Forwarding baseline ($\text{Time}_{\text{No FW}} = 3.67 \times 160\text{ ps} = \mathbf{587.2\text{ ps}}$):
@@ -389,12 +376,12 @@ To compare the actual execution time per instruction, we multiply $\text{CPI} \t
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{@{}l c c c c@{}}
 \toprule
-\textbf{Forwarding Configuration} & \textbf{Clock ($T_{\text{clk}}$)} & \textbf{CPI (A / B)} & \textbf{Time / Inst (A / B)} & \textbf{Speedup vs. No FW} \\
+\textbf{Forwarding Configuration} & \textbf{Clock ($T_{\text{clk}}$)} & \textbf{CPI} & \textbf{Time / Inst} & \textbf{Speedup vs. No FW} \\
 \midrule
 No Forwarding & $160\text{ ps}$ & $3.67$ & $587.2\text{ ps}$ & $\mathbf{1.00\times}$ (Baseline) \\
 Only \texttt{EX/M1} $\rightarrow$ \texttt{EX} & $160\text{ ps}$ & $3.07$ & $491.2\text{ ps}$ & $\mathbf{1.20\times}$ \\
-Only \texttt{M1/M2} $\rightarrow$ \texttt{EX} & $160\text{ ps}$ & $2.92$ / $3.42$ & $467.2$ / $547.2\text{ ps}$ & $\mathbf{1.26\times}$ / $\mathbf{1.07\times}$ \\
-Only \texttt{M2/RW} $\rightarrow$ \texttt{EX} & $160\text{ ps}$ & $2.67$ / $3.17$ & $427.2$ / $507.2\text{ ps}$ & $\mathbf{1.375\times}$ / $\mathbf{1.16\times}$ \\
+Only \texttt{M1/M2} $\rightarrow$ \texttt{EX} & $160\text{ ps}$ & $2.92$ & $467.2\text{ ps}$ & $\mathbf{1.26\times}$ \\
+Only \texttt{M2/RW} $\rightarrow$ \texttt{EX} & $160\text{ ps}$ & $2.67$ & $427.2\text{ ps}$ & $\mathbf{1.375\times}$ \\
 Full ALU Forwarding (All 3) & $200\text{ ps}$ & $1.82$ & $364.0\text{ ps}$ & $\mathbf{1.61\times}$ \\
 \bottomrule
 \end{tabular}}
@@ -423,11 +410,12 @@ Full ALU Forwarding (All 3) & $200\text{ ps}$ & $1.82$ & $364.0\text{ ps}$ & $\m
 \textbf{Assumptions and Logic:}
 \begin{itemize}[noitemsep, topsep=2pt]
     \item Stalling is handled separately by the Hazard Detection Unit (HDU), so the forwarding unit equations remain the same regardless of stalls. The forwarding unit only checks if the instruction currently in \texttt{EX} needs a register value held in \texttt{EX/M1}, \texttt{M1/M2}, or \texttt{M2/RW}.
-    \item We assume the \texttt{RegWrite}, \texttt{Rd}, and \texttt{MemRead} control fields are carried in the CPU's \texttt{EX/M1} and \texttt{M1/M2} pipeline registers, and that \texttt{RegWrite}, \texttt{Dest}, and \texttt{FPWrite} are carried in \texttt{M2/RW}. Here \texttt{M2/RW} is the shared write-back register introduced in part iii (the same physical register as \texttt{EX3/RW}); an integer write is present only when \texttt{FPWrite == 0}. These are CPU-side pipeline registers, distinct from the memory's internal pipeline registers.
+    \item We assume the \texttt{RegWrite}, \texttt{Rd}, and \texttt{MemRead} control fields are carried in the CPU's \texttt{EX/M1} and \texttt{M1/M2} pipeline registers, and that \texttt{RegWrite}, \texttt{Rd}, and \texttt{FPWrite} are carried in \texttt{M2/RW}. Here \texttt{M2/RW} is the shared write-back register introduced in part iii (the same physical register as \texttt{EX3/RW}); an integer write is present only when \texttt{FPWrite == 0}. These are CPU-side pipeline registers, distinct from the memory's internal pipeline registers.
+    \item We call the field \texttt{Rd} at every stage, including in \texttt{M2/RW}. An integer instruction writes the integer \texttt{Rd} and an FP instruction writes the FP \texttt{Fd}, but both are the same register-number field, so keeping the name \texttt{Rd} is consistent. The \texttt{FPWrite} bit tells us which register file the number refers to.
     \item For paths \texttt{EX/M1} and \texttt{M1/M2}, we check that \texttt{MemRead == 0} because a Load instruction (\texttt{lw}) does not have its data ready until the end of \texttt{M2}. In \texttt{M2/RW}, the \texttt{lw} data is ready, so we do not negate \texttt{MemRead} there.
-    \item Since integer register \texttt{x0} is hardwired to zero, we must check that the destination register is not \texttt{x0} ($\texttt{Rd} \neq 0$).
+    \item Since integer register \texttt{x0} is hardwired to zero, we must check that \texttt{Rd} is not \texttt{x0} ($\texttt{Rd} \neq 0$).
     \item \texttt{RegWrite = 1} for both integer and FP writes, so it cannot tell them apart. On the write-back path we therefore also require \texttt{M2/RW.FPWrite == 0}; otherwise an FP write (or \texttt{flw}) with the same register number would wrongly forward into an integer \texttt{Rs}. The \texttt{EX/M1} and \texttt{M1/M2} paths do not need this check: the only FP write that goes through them is \texttt{flw}, and \texttt{MemRead == 0} already blocks it.
-    \item \textbf{Priority Rule:} If more than one later stage writes to the same destination register, we must pick the latest (youngest) instruction. Therefore, \texttt{EX/M1} has the highest priority, \texttt{M1/M2} only forwards if \texttt{EX/M1} does not match, and \texttt{M2/RW} only forwards if neither \texttt{EX/M1} nor \texttt{M1/M2} matches.
+    \item \textbf{Priority Rule:} If more than one later stage writes the same \texttt{Rd}, we must pick the latest (youngest) instruction. Therefore, \texttt{EX/M1} has the highest priority, \texttt{M1/M2} only forwards if \texttt{EX/M1} does not match, and \texttt{M2/RW} only forwards if neither \texttt{EX/M1} nor \texttt{M1/M2} matches.
 \end{itemize}
 
 \textbf{1. Forwarding Logic for First ALU Operand (\texttt{Rs1} / \texttt{ForwardA}):}
@@ -439,7 +427,7 @@ Full ALU Forwarding (All 3) & $200\text{ ps}$ & $1.82$ & $364.0\text{ ps}$ & $\m
     \text{Cond}_{2A} &= (\texttt{M1/M2.RegWrite} == 1) \text{ and } (\texttt{M1/M2.Rd} \neq 0) \\
                      &\quad \text{and } (\texttt{M1/M2.MemRead} == 0) \text{ and } (\texttt{M1/M2.Rd} == \texttt{ID/EX.Rs1}) \\
     \text{Cond}_{3A} &= (\texttt{M2/RW.RegWrite} == 1) \text{ and } (\texttt{M2/RW.FPWrite} == 0) \\
-                     &\quad \text{and } (\texttt{M2/RW.Dest} \neq 0) \text{ and } (\texttt{M2/RW.Dest} == \texttt{ID/EX.Rs1})
+                     &\quad \text{and } (\texttt{M2/RW.Rd} \neq 0) \text{ and } (\texttt{M2/RW.Rd} == \texttt{ID/EX.Rs1})
 \end{align*}
 
 \textit{Control Signal Equations for \texttt{ForwardA} (with Priority):}
@@ -469,7 +457,7 @@ Full ALU Forwarding (All 3) & $200\text{ ps}$ & $1.82$ & $364.0\text{ ps}$ & $\m
     \text{Cond}_{2B} &= (\texttt{M1/M2.RegWrite} == 1) \text{ and } (\texttt{M1/M2.Rd} \neq 0) \\
                      &\quad \text{and } (\texttt{M1/M2.MemRead} == 0) \text{ and } (\texttt{M1/M2.Rd} == \texttt{ID/EX.Rs2}) \\
     \text{Cond}_{3B} &= (\texttt{M2/RW.RegWrite} == 1) \text{ and } (\texttt{M2/RW.FPWrite} == 0) \\
-                     &\quad \text{and } (\texttt{M2/RW.Dest} \neq 0) \text{ and } (\texttt{M2/RW.Dest} == \texttt{ID/EX.Rs2})
+                     &\quad \text{and } (\texttt{M2/RW.Rd} \neq 0) \text{ and } (\texttt{M2/RW.Rd} == \texttt{ID/EX.Rs2})
 \end{align*}
 
 \textit{Control Signal Equations for \texttt{ForwardB} (with Priority):}
@@ -512,27 +500,11 @@ Full ALU Forwarding (All 3) & $200\text{ ps}$ & $1.82$ & $364.0\text{ ps}$ & $\m
 \begin{itemize}[noitemsep, topsep=2pt]
     \item Every FP execution instruction goes through \texttt{EX1}, \texttt{EX2} and \texttt{EX3}, and the result is only ready at the end of \texttt{EX3}. So we cannot forward from \texttt{EX1/EX2} or \texttt{EX2/EX3}.
     \item \textbf{One shared write-back register:} The integer and FP paths are both 7 stages, so \texttt{M2} and \texttt{EX3} are the same stage just before \texttt{RW}. Since the machine is single-issue and in-order, only one instruction can be in \texttt{RW} at a time, so we use one physical register \texttt{RW} instead of separate \texttt{M2/RW} and \texttt{EX3/RW}. A 2:1 mux selects the integer result from \texttt{M2} or the FP result from \texttt{EX3}.
-    \item \texttt{RW} carries \texttt{RegWrite}, \texttt{Dest} (either \texttt{Rd} or \texttt{Fd}), \texttt{FPWrite} and the write data. \texttt{FPWrite = 1} writes the FP register file and \texttt{FPWrite = 0} writes the integer one. The load-data mux is before \texttt{RW}, so \texttt{RW} does not need a \texttt{MemToReg} field.
+    \item \texttt{RW} carries \texttt{RegWrite}, \texttt{Rd}, \texttt{FPWrite} and the write data. The number in \texttt{Rd} is the integer register \texttt{Rd} for an integer write and the FP register \texttt{Fd} for an FP write, and \texttt{FPWrite} selects which register file is written. The load-data mux is before \texttt{RW}, so \texttt{RW} does not need a \texttt{MemToReg} field.
     \item \texttt{flw} uses the integer memory path, so its data is ready at the end of \texttt{M2} and also goes through \texttt{RW}. The FP unit therefore has only one data input, \texttt{RW}, and the same path works for both FP ALU results and \texttt{flw}. A dependent FP instruction then stalls 2 cycles instead of 3.
     \item \texttt{f0} is a normal FP register, not hardwired to zero, so there is no $\texttt{Fd} \neq 0$ check.
-    \item \textbf{Pending writers:} A younger writer may still be in \texttt{EX2} or \texttt{EX3}, or in the memory stages for \texttt{flw}, so its value is not ready yet. We call this \texttt{PendingA}/\texttt{PendingB}. While it is true, \texttt{RW} holds an older value, so the forward must be blocked and the consumer has to stall. The stall comes from the HDU (Question 4); Pending is here only to keep the forward equation correct.
+    \item \textbf{Timing assumption:} We assume the HDU (or the compiler/scheduler) guarantees that a consumer only reaches \texttt{EX1} when the youngest matching producer is in \texttt{RW}. If a matching producer is still in \texttt{EX2}/\texttt{EX3} or the memory stages, the consumer is held in \texttt{ID}, so the forwarding unit never forwards a stale \texttt{RW} value. This lets the forwarding unit compare only \texttt{RW} against \texttt{Fs1}/\texttt{Fs2}; it does not need to inspect \texttt{EX1/EX2}, \texttt{EX2/EX3}, \texttt{EX/M1}, or \texttt{M1/M2}.
 \end{itemize}
-
-\textbf{Pending-Writer Match Conditions:}
-\begin{align*}
-    \text{Pending}_A &= (\texttt{EX1/EX2.RegWrite} == 1) \text{ and } (\texttt{EX1/EX2.Fd} == \texttt{ID/EX1.Fs1}) \\
-                     &\quad \text{or } (\texttt{EX2/EX3.RegWrite} == 1) \text{ and } (\texttt{EX2/EX3.Fd} == \texttt{ID/EX1.Fs1}) \\
-                     &\quad \text{or } (\texttt{EX/M1.MemRead} == 1) \text{ and } (\texttt{EX/M1.FPWrite} == 1) \\
-                     &\quad\qquad \text{and } (\texttt{EX/M1.Rd} == \texttt{ID/EX1.Fs1}) \\
-                     &\quad \text{or } (\texttt{M1/M2.MemRead} == 1) \text{ and } (\texttt{M1/M2.FPWrite} == 1) \\
-                     &\quad\qquad \text{and } (\texttt{M1/M2.Rd} == \texttt{ID/EX1.Fs1}) \\[2pt]
-    \text{Pending}_B &= (\texttt{EX1/EX2.RegWrite} == 1) \text{ and } (\texttt{EX1/EX2.Fd} == \texttt{ID/EX1.Fs2}) \\
-                     &\quad \text{or } (\texttt{EX2/EX3.RegWrite} == 1) \text{ and } (\texttt{EX2/EX3.Fd} == \texttt{ID/EX1.Fs2}) \\
-                     &\quad \text{or } (\texttt{EX/M1.MemRead} == 1) \text{ and } (\texttt{EX/M1.FPWrite} == 1) \\
-                     &\quad\qquad \text{and } (\texttt{EX/M1.Rd} == \texttt{ID/EX1.Fs2}) \\
-                     &\quad \text{or } (\texttt{M1/M2.MemRead} == 1) \text{ and } (\texttt{M1/M2.FPWrite} == 1) \\
-                     &\quad\qquad \text{and } (\texttt{M1/M2.Rd} == \texttt{ID/EX1.Fs2})
-\end{align*}
 
 \textbf{1. FP Forwarding Logic for First Operand (\texttt{Fs1} / \texttt{FP\_ForwardA}):}
 \begin{itemize}[noitemsep, topsep=2pt]
@@ -540,10 +512,10 @@ Full ALU Forwarding (All 3) & $200\text{ ps}$ & $1.82$ & $364.0\text{ ps}$ & $\m
     \[
     \begin{aligned}
         &(\texttt{RW.RegWrite} == 1) \text{ and } (\texttt{RW.FPWrite} == 1) \\
-        &\quad \text{and } (\texttt{RW.Dest} == \texttt{ID/EX1.Fs1}) \text{ and } \neg\text{Pending}_A
+        &\quad \text{and } (\texttt{RW.Rd} == \texttt{ID/EX1.Fs1})
     \end{aligned}
     \]
-    \item \textbf{No Forwarding (\texttt{FP\_ForwardA = 0}):} Otherwise the operand is read from the FP register file. If $\text{Pending}_A$ is true, the forward is blocked and the HDU has to hold the consumer (see Question 4).
+    \item \textbf{No Forwarding (\texttt{FP\_ForwardA = 0}):} Otherwise the operand is read from the FP register file. The HDU holds the consumer in \texttt{ID} whenever a matching producer is not yet in \texttt{RW} (see Question~4).
 \end{itemize}
 
 \textbf{2. FP Forwarding Logic for Second Operand (\texttt{Fs2} / \texttt{FP\_ForwardB}):}
@@ -552,10 +524,10 @@ Full ALU Forwarding (All 3) & $200\text{ ps}$ & $1.82$ & $364.0\text{ ps}$ & $\m
     \[
     \begin{aligned}
         &(\texttt{RW.RegWrite} == 1) \text{ and } (\texttt{RW.FPWrite} == 1) \\
-        &\quad \text{and } (\texttt{RW.Dest} == \texttt{ID/EX1.Fs2}) \text{ and } \neg\text{Pending}_B
+        &\quad \text{and } (\texttt{RW.Rd} == \texttt{ID/EX1.Fs2})
     \end{aligned}
     \]
-    \item \textbf{No Forwarding (\texttt{FP\_ForwardB = 0}):} Otherwise the operand is read from the FP register file. If $\text{Pending}_B$ is true, the forward is blocked and the HDU has to hold the consumer (see Question 4).
+    \item \textbf{No Forwarding (\texttt{FP\_ForwardB = 0}):} Otherwise the operand is read from the FP register file. The HDU holds the consumer in \texttt{ID} whenever a matching producer is not yet in \texttt{RW} (see Question~4).
 \end{itemize}
 
 \vspace{8pt}
@@ -564,8 +536,6 @@ Full ALU Forwarding (All 3) & $200\text{ ps}$ & $1.82$ & $364.0\text{ ps}$ & $\m
 \showdiag{forwarding_interface}
 
 \textbf{Mux encoding:} For the integer 4:1 muxes, \texttt{00} = \texttt{ID/EX}, \texttt{01} = \texttt{EX/M1}, \texttt{10} = \texttt{M1/M2}, \texttt{11} = \texttt{RW} (the shared write-back register, used only when \texttt{RW.FPWrite = 0}). For the FP 2:1 muxes, \texttt{0} = \texttt{ID/EX1}, \texttt{1} = \texttt{RW}. The write-back register's own 2:1 source mux selects \texttt{0} = \texttt{M2} (integer result or load data) and \texttt{1} = \texttt{EX3} (FP result).
-
-The FP forwarding unit also receives \texttt{PendingA} and \texttt{PendingB} from part iii. These block the write-back forward while a younger FP writer is still in \texttt{EX2}, \texttt{EX3}, or the memory stages, so the consumer does not forward a stale \texttt{RW} value.
 
 
 
@@ -607,7 +577,7 @@ The \texttt{lw}$\rightarrow$\texttt{sw} row also relies on the \texttt{M2/RW}$\r
 
 \subsection*{ii. Hazard Detection Unit (HDU) Stall Conditions \& Held Registers}
 
-\textbf{Notation.} The consumer is in \texttt{ID}, so its source registers are the fields of \texttt{F2/ID}. Integer producers are read from \texttt{ID/EX} and \texttt{EX/M1}, while FP producers are read from \texttt{ID/EX1} and \texttt{EX1/EX2}. The valid bits $V_1,V_2,VF_1,VF_2$ mask source ports that the instruction does not use, and \texttt{usesInt}/\texttt{usesFP} indicate which execution path the consumer takes; both are true for \texttt{fsw}. \texttt{FPWrite} is carried alongside \texttt{RegWrite}, \texttt{Rd}, and \texttt{MemRead} so that an integer load can be distinguished from an FP load. This does not change the forwarding equations from Question~3.
+\textbf{Notation.} The consumer is in \texttt{ID}, so its source registers are the fields of \texttt{F2/ID}. Integer producers are read from \texttt{ID/EX} and \texttt{EX/M1}, while FP producers are read from \texttt{ID/EX1} and \texttt{EX1/EX2}. The valid bits $V_1,V_2,VF_1,VF_2$ mask source ports that the instruction does not use, so a stall term can only fire for a source the consumer actually reads. \texttt{FPWrite} is carried alongside \texttt{RegWrite}, \texttt{Rd}, and \texttt{MemRead} so that an integer load can be distinguished from an FP load. This does not change the forwarding equations from Question~3.
 
 \begin{align*}
 \text{IntMatch}(D) &= (D=\texttt{F2/ID.Rs1}\text{ and } V_1)\text{ or }(D=\texttt{F2/ID.Rs2}\text{ and } V_2),\\
@@ -646,8 +616,7 @@ There is no $\texttt{Rd}\neq0$ check in this case because \texttt{flw} writes an
 
 \textbf{4. Combined stall signal and register controls:}
 \begin{align*}
-\text{Stall} &= (\texttt{usesInt}\text{ and }\text{Stall}_{\text{lw}})
-\text{ or }\big(\texttt{usesFP}\text{ and }(\text{Stall}_{\text{flw}}\text{ or }\text{Stall}_{\text{fp}})\big),\\
+\text{Stall} &= \text{Stall}_{\text{lw}}\text{ or }\text{Stall}_{\text{flw}}\text{ or }\text{Stall}_{\text{fp}},\\
 \texttt{PCWrite} &= \neg\text{Stall},\\
 \texttt{F2/IDWrite} &= \neg\text{Stall},\\
 \texttt{BufferWrite} &= \text{Stall}\text{ and }\neg\texttt{BufferValid},\\
@@ -697,12 +666,12 @@ t+4 & C & C+4 & C+8 & empty & C+4 enters \texttt{ID} \\
 \end{tabular}
 \end{center}
 
-When B is read out of the buffer, the \texttt{F2/ID.PC} input is taken from the saved B.PC; otherwise it comes from the \texttt{F1/F2} register. The buffer is written once on the first stall cycle and read when the stall ends, so its valid bit is updated by
+When B is read out of the buffer, the \texttt{F2/ID.PC} input is taken from the saved B.PC; otherwise it comes from the \texttt{F1/F2} register. The buffer is written once on the first stall cycle and read when the stall ends. The valid bit is a synchronous flip-flop, so its next state is
 \begin{align*}
-\texttt{BufferValid}_{\text{next}} &= \big(\texttt{BufferWrite}\text{ or }(\texttt{BufferValid}\text{ and }\texttt{Stall})\big)\text{ and }\neg\texttt{BufferFlush},\\
+\texttt{BufferValid}_{\text{next}} &= \texttt{Stall}\text{ and }\neg\texttt{BufferFlush},\\
 \texttt{BufferClear} &= \texttt{BufferValid}\text{ and }\neg\texttt{Stall}.
 \end{align*}
-\texttt{BufferWrite} sets the valid bit when B is captured, and the term \texttt{BufferValid and Stall} keeps it set for the rest of the stall. When the stall ends, \texttt{BufferClear} is asserted together with \texttt{BufferRead}, so the entry is marked invalid at the end of that cycle. This prevents the same instruction from being read twice, and normal fetching resumes on the next cycle. A branch redirect also clears the valid bit through \texttt{BufferFlush}, which overrides the set term.
+$\texttt{BufferValid}_{\text{next}}$ is 1 whenever a stall is active: \texttt{BufferWrite} sets it on the first stall cycle (filling), and \texttt{BufferValid and Stall} holds it for the rest of the stall. Together these two cases are simply \texttt{Stall}. When the stall ends, \texttt{BufferClear} is asserted together with \texttt{BufferRead}, so the entry is marked invalid at the end of that cycle. This prevents the same instruction from being read twice, and normal fetching resumes on the next cycle. A branch redirect also clears the valid bit through \texttt{BufferFlush}, which overrides the set term.
 
 \begin{center}
 \resizebox{0.6\textwidth}{!}{\input{diagrams/fetch-buffer.tikz}}\\[2pt]
@@ -717,7 +686,7 @@ A stall only zeroes the control words entering \texttt{ID/EX} and \texttt{ID/EX1
 
 \textbf{Inputs.}
 \begin{itemize}[noitemsep, topsep=2pt]
-    \item \texttt{F2/ID.Rs1}, \texttt{Rs2}, \texttt{Fs1}, \texttt{Fs2}: the consumer's source registers. The valid bits $V_1,V_2,VF_1,VF_2$ indicate which of them are actually used, and \texttt{usesInt}/\texttt{usesFP} show which execution path the instruction takes.
+    \item \texttt{F2/ID.Rs1}, \texttt{Rs2}, \texttt{Fs1}, \texttt{Fs2}: the consumer's source registers. The valid bits $V_1,V_2,VF_1,VF_2$ indicate which of them are actually used.
     \item \texttt{F2/ID.PC}: the consumer's PC. It comes from the \texttt{F1/F2} register, or from the buffer when B is read out, and is needed for PC-relative branch targets.
     \item \texttt{BufferValid}: tells the HDU whether the buffer is already occupied, so B is written only once.
     \item \texttt{ID/EX}, \texttt{EX/M1}: \texttt{MemRead}, \texttt{RegWrite}, \texttt{FPWrite}, and \texttt{Rd}. These identify an integer load or an \texttt{flw} currently in \texttt{EX} or \texttt{M1}.
@@ -836,5 +805,19 @@ The simulation output produced by the testbench is shown in Figure~\ref{fig:alu-
     \caption{Simulation output of the RV32I ALU testbench.}
     \label{fig:alu-sim}
 \end{figure}
+
+\vspace{8pt}
+\hrule
+\vspace{8pt}
+
+\section*{\textcolor{accent}{Declaration of AI Use and Tools}}
+
+AI assistance was used in the preparation of this report in the following ways:
+\begin{itemize}[noitemsep, topsep=2pt]
+    \item \textbf{Diagram generation:} The hand-drawn circuit and pipeline diagrams were converted into TikZ code with the help of AI. The generated TikZ code was then reviewed and corrected using a TikZ GUI editor.
+    \item \textbf{Design assistance:} The initial idea and basic structure of a two-entry fetch buffer came from AI. We then tested and analysed that idea ourselves and found that a single-entry buffer is sufficient, so the final design uses only one entry.
+    \item \textbf{Report formatting:} AI was used to help format the report and to improve the clarity of its language and presentation. The technical content, analysis, and conclusions remain the work and responsibility of the authors.
+    \item \textbf{Simulation and benchmarking:} The SystemVerilog design and its testbench were compiled, simulated, and benchmarked using EDA Playground.
+\end{itemize}
 
 \end{document}
