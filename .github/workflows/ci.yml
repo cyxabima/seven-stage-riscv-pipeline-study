@@ -11,17 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile LaTeX report
-        uses: xu-cheng/latex-action@v3
+      - name: Compile report and export figures
+        uses: xu-cheng/latex-action@v4
         with:
           root_file: main.tex
           args: -pdf -interaction=nonstopmode -file-line-error
-
-      - name: Install figure export tools
-        run: sudo apt-get update && sudo apt-get install -y poppler-utils
-
-      - name: Export README figures
-        run: ./scripts/export-figures.sh
+          extra_system_packages: "poppler-utils"
+          post_compile: "./scripts/export-figures.sh"
 
       - name: Upload PDF
         uses: actions/upload-artifact@v4
